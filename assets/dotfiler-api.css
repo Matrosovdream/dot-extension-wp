@@ -1,0 +1,49 @@
+.validate-phone-wrapper {
+    margin-top: 20px;
+    max-width: 400px;
+}
+
+.phone-validate-form {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.phone-validate-form input {
+    padding: 8px!important;
+    margin-right: 10px;
+    border: 1px solid #ccc!important;
+    border-radius: 5px!important;
+    height: auto!important;
+}
+
+.phone-validate-form button {
+    padding: 7px 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background: #0073aa;
+    color: #fff;
+    cursor: pointer;
+    font-size: 17px;
+}
+
+.phone-validation-list {
+    list-style: none;
+    padding: 0;
+}
+
+.phone-validation-list li {
+    margin-bottom: 0;
+}
+
+.validation-error {
+    color: red;
+    text-align: center;
+    font-weight: bold;
+}
+
+.validation-process {
+    text-align: center;
+    color: green;
+    font-weight: bold;
+}
