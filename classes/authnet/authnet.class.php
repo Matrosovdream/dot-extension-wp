@@ -259,7 +259,7 @@ class Dotfiler_authnet {
         global $wpdb;
 
         $query = "SELECT * FROM wp_frm_payments_failed WHERE entry_id={$entry_id}";
-        return $wpdb->get_results( $query, ARRAY_A )[0] ?? [];
+        return $wpdb->get_results( $query, ARRAY_A )[0];
 
     }
 
