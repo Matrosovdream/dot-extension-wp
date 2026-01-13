@@ -54,6 +54,9 @@ class Dotfiler_init {
         // Entries cleaner extra tables
         require_once DOTFILER_BASE_URL.'/classes//migrations/archive.entries.php';
 
+        // Indexes
+        require_once DOTFILER_BASE_URL.'/classes/migrations/DotMigrationIndexes.php';
+
     }
 
     private function include_shortcodes() {
