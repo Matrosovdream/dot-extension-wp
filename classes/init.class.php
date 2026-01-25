@@ -76,6 +76,9 @@ class Dotfiler_init {
         // Phone validation
         require_once DOTFILER_BASE_URL.'/shortcodes/phone.validate.php';
 
+        // Shortcode Ajax Loader
+        require_once DOTFILER_BASE_URL.'/shortcodes/shortcode.ajax.loader.php';
+
 
     }
 
