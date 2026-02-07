@@ -47,13 +47,16 @@ class Dotfiler_init {
         // Formidable addons
         require_once DOTFILER_BASE_URL.'/addons/Formidable/AttachFilesToEmail.php';
 
+        // Helpers
+        $this->include_helpers();
+
     }
 
     private function include_migrations() {
 
         // Entries cleaner extra tables
         require_once DOTFILER_BASE_URL.'/classes//migrations/archive.entries.php';
-
+        
         // Indexes
         require_once DOTFILER_BASE_URL.'/classes/migrations/DotMigrationIndexes.php';
 
@@ -76,8 +79,8 @@ class Dotfiler_init {
         // Phone validation
         require_once DOTFILER_BASE_URL.'/shortcodes/phone.validate.php';
 
-        // Shortcode Ajax Loader
-        require_once DOTFILER_BASE_URL.'/shortcodes/shortcode.ajax.loader.php';
+        // Entries mass photo
+        require_once DOTFILER_BASE_URL.'/shortcodes/frm-entries-mass-photo.php';
 
 
     }
@@ -90,6 +93,12 @@ class Dotfiler_init {
 
         // Page CSS/JS scripts
         require_once DOTFILER_BASE_URL.'/actions/page.php';
+
+    }
+
+    private function include_helpers() {
+
+        require_once DOTFILER_BASE_URL.'/classes/helpers/DotFrmEntryHelper.php';
 
     }
 
