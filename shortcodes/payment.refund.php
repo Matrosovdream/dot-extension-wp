@@ -8,6 +8,8 @@ function payment_refund_shortcode($atts) {
 
     // Get variables
     $order_id = $_GET['id'];
+    $sum = $_GET['amt'] ?? null;
+
     $payment = $ref->get_payment( $order_id );
     $payment_id = $payment['id'];
 
@@ -51,6 +53,11 @@ function payment_refund_shortcode($atts) {
     // Get max refund amount
     $sum_max = $payment['refund_amount'];
     $value = $sum_max;
+
+    if( !empty($sum) ) {
+        $value = $sum;
+    }
+
     if( isset($_POST['sum']) ) {
         $value = $_POST['sum'];
     }
