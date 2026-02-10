@@ -1,105 +1,66 @@
 <?php
+if ( ! defined('ABSPATH') ) { exit; }
 
-class DotFrmEntryHelper {
+class DotFrmPhotoEntryHelper {
 
-    public function getEntryById($entryId) {
+    private const FIELD_SELECT_VALUES = [
+        [
+            'form_id' => 7,
+            'references' => [
+                'status' => [
+                    'label' => 'Status',
+                    'field_id' => 193
+                ],
+                'agent' => [
+                    'label' => 'Agent',
+                    'field_id' => 694
+                ],
+                'passport_type' => [
+                    'label' => 'Passport Type',
+                    'field_id' => 330
+                ],
+            ]
+        ]
+    ];
 
-        if (class_exists('FrmEntry')) {
-            return FrmEntry::getOne($entryId, true);
-        }
-        return null;
+    private const FIELDS_MAP = [
+        'order_id' => 194,
+        'status' => 193,
+        'service' => 330,
+        'email' => 664,
+        'uploaded_photo_id' => 215,
+        'final_photo_id' => 668,
+    ];
 
-    }
-
-     /**
-     * Get dropdown/select options from wp_frm_fields.options
+    /**
+     * Prepare / normalize entry before returning
      */
-    public function getSelectFieldValues(int $field_id): array {
-        global $wpdb;
+    public function prepareEntryItem(array $item): array {
+        $item['id']      = (int) ($item['id'] ?? 0);
+        $item['form_id'] = (int) ($item['form_id'] ?? 0);
+        $item['metas']   = (isset($item['metas']) && is_array($item['metas'])) ? $item['metas'] : [];
 
-        $field_id = (int) $field_id;
-        if ($field_id <= 0) { return []; }
+        // Prepare mapped fields
+        $fields = [];
+        foreach (self::FIELDS_MAP as $key => $field_id) {
+            $field_id = (int) $field_id;
+            if ($field_id <= 0) { continue; }
+            $fields[$key] = $item['metas'][$field_id] ?? null;
 
-        $fields_table = $wpdb->prefix . 'frm_fields';
-
-        $raw = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT `options` FROM {$fields_table} WHERE id = %d LIMIT 1",
-                $field_id
-            )
-        );
-
-        if (!$raw) { return []; }
-
-        $opts = maybe_unserialize($raw);
-        if (!is_array($opts)) { return []; }
-
-        $out = [];
-
-        foreach ($opts as $row) {
-            if (!is_array($row)) { continue; }
-
-            $label = trim((string)($row['label'] ?? ''));
-            $value = trim((string)($row['value'] ?? ''));
-
-            if ($label === '' && $value === '') { continue; }
-
-            if ($label === '') { $label = $value; }
-            if ($value === '') { $value = $label; }
-
-            $out[] = [
-                'label' => $label,
-                'value' => $value,
-            ];
-        }
-
-        return $out;
-    }
-
-    public function getSelectRefs(int $form_id, array $fieldsMap): array {
-        
-        $form_id = (int) $form_id;
-        if ($form_id <= 0) {
-            return [];
-        }
-
-        $entryHelper = new DotFrmEntryHelper();
-
-        foreach ($fieldsMap as $row) {
-
-            if ((int)($row['form_id'] ?? 0) !== $form_id) {
-                continue;
+            if( $key === 'uploaded_photo_id' && !empty( $fields[$key] ) ) {
+                $fields['uploaded_photo_url'] = wp_get_attachment_url( (int)$fields[$key] );
             }
 
-            if (empty($row['references']) || !is_array($row['references'])) {
-                return [];
+            if( $key === 'final_photo_id' && !empty( $fields[$key] ) ) {
+                $fields[$key] = $fields[$key][1];
+                $fields['final_photo_url'] = wp_get_attachment_url( (int)$fields[$key] );
             }
 
-            $out = [];
-
-            foreach ($row['references'] as $key => $ref) {
-
-                if (
-                    !is_array($ref) ||
-                    empty($ref['field_id'])
-                ) {
-                    continue;
-                }
-
-                $field_id = (int) $ref['field_id'];
-
-                $out[$key] = [
-                    'label'    => (string) ($ref['label'] ?? $key),
-                    'field_id' => $field_id,
-                    'values'   => $entryHelper->getSelectFieldValues($field_id),
-                ];
-            }
-
-            return $out;
         }
 
-        return [];
+        $item['field_values'] = $fields;
 
+        return $item;
     }
 
     /**
@@ -255,6 +216,23 @@ class DotFrmEntryHelper {
                 'total_pages' => (int) ceil($total / $paginate),
             ],
         ];
+    }
+
+    public function getEntryById(int $entry_id): ?array {
+
+        $entryRaw = FrmEntry::getOne($entry_id, true);
+        // To array by json encode/decode
+        $entry = json_decode(json_encode($entryRaw), true);
+
+        return $this->prepareEntryItem($entry);
+
+    }
+
+    public function getSelectRefs(int $form_id): array {
+
+        $helper = new DotFrmEntryHelper();
+        return $helper->getSelectRefs($form_id, self::FIELD_SELECT_VALUES);
+        
     }
 
 }
