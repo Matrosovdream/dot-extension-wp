@@ -118,4 +118,47 @@ class DotFrmMassRefundHelper {
 
     }
 
+    public function refundPaymentByOrderId( int $entry_id, float $amount, string $reason ):array {
+
+        $ref = new Dotfiler_authnet_refund();
+
+        $payment = $ref->get_payment( $entry_id );
+        $payment_id = $payment['id'];
+
+        if( isset($payment) ) {
+            $refundRes = $ref->refund_payment( $payment_id, $entry_id, $amount );
+        } else {
+            $refundRes = [ 'ok'=>false,'error'=>'Payment not found' ];
+        }
+
+        return $refundRes;
+
+    }
+
+    public function setRefundStatus( int $refund_id, string $status ): void {
+
+        $helper = new DotFrmEntryHelper();
+        $helper->updateMetaField( $refund_id, self::FIELDS_MAP['status'], $status );
+
+    }
+
+    public function setOrderStatus( int $order_id, string $status ): void {
+
+        $helper = new DotFrmEntryHelper();
+        $helper->updateMetaField( $order_id, 7, $status );
+
+    }
+
+    public function updateRefundFields( int $refund_id, array $fields ): void {
+
+        $helper = new DotFrmEntryHelper();
+
+        foreach( $fields as $key => $value ) {
+            if( !isset( self::FIELDS_MAP[$key] ) ) { continue; }
+            $field_id = self::FIELDS_MAP[$key];
+            $helper->updateMetaField( $refund_id, $field_id, $value );
+        }
+
+    }
+
 }
