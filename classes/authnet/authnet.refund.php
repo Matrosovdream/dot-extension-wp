@@ -15,6 +15,7 @@ class Dotfiler_authnet_refund {
             // If already refunded (full sum)
             if( $payment->status == 'refunded' ) {
                 return array(
+                    'ok' => false,
                     'message' => __( 'Already refunded', 'formidable-payments' ),
                     'payment_status' => 'refunded'
                 );
@@ -49,17 +50,21 @@ class Dotfiler_authnet_refund {
                 // completed, refunded
                 $frm_payment->update( $payment_id, array( 'status' => $status ) );
                 
+                $ok = true;
                 $message = __( 'Refunded', 'formidable-payments' );
 
             } else {
+                $ok = false;
                 $message = __( 'Failed', 'formidable-payments' );
             }
 
 		} else {
+            $ok = false;
 			$message = __( 'Oops! No payment was selected for refund.', 'formidable-payments' );
 		}
 
         return array(
+            'ok' => $ok,
             'message' => $message,
             'payment_status' => $status
         );
