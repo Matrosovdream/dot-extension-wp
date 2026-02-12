@@ -56,9 +56,42 @@ class DotFrmMassRefundHelper {
         if( $order_id ) {
             $item['order'] = $this->getOriginalOrder( $order_id );
             $item['order']['refund_history'] = $this->getOrderRefundHistory( $order_id );
+            $item['order']['payment'] = $this->getOrderPayment( $order_id );
         }
 
+        // Get similar refunds requests with the same order_id
+        $item['similar_refunds'] = $this->getSimilarRefunds( $order_id, $item['id'] );
+
         return $item;
+    }
+
+    public function getSimilarRefunds( int $order_id, int $exclude_entry_id ): array {
+
+        $helper = new DotFrmEntryHelper();
+        $filters = [
+            [
+                'field_id' => self::FIELDS_MAP['order_id'],
+                'value'    => $order_id,
+                'compare'  => '=',
+            ],
+        ];
+
+        $res = $helper->getList( $filters, 1, 100, 4 );
+
+        $items = [];
+        $items_ids = [];
+        foreach( $res['data'] as $item ) {
+            if( $item->id == $exclude_entry_id ) { continue; }
+            $items[] = $item;
+            $items_ids[] = $item->id;
+        }
+
+        return [
+            //'items' => $items,
+            'item_ids' => $items_ids,
+            'count' => count( $items_ids )
+        ];
+
     }
 
     public function getEntryById(int $entry_id): ?array {
@@ -81,8 +114,12 @@ class DotFrmMassRefundHelper {
             'notes' => $metas[5] ?? null,
         ];
 
+        // Process fields
+        $entry['created_at'] = date( 'Y-m-d H:i', strtotime( $entry['created_at'] ) );
+
         unset( $entry['metas'] );
         $entry['field_values'] = $field_values;
+        $entry['shipments'] = $this->getOrderShipments( $entry_id );
 
         return $entry;
 
@@ -170,5 +207,31 @@ class DotFrmMassRefundHelper {
         }
 
     }
+
+    public function getOrderShipments( int $entry_id ): array {
+
+        $helper = new DotFrmEntryHelper();
+        return $helper->getEntryShipments( $entry_id );
+
+    }
+
+    public function getOrderRefStatuses() {
+
+        return [
+            'values' => [
+                'Refunded' => 'Refunded',
+             ]
+        ];
+
+    }
+
+    public function getOrderPayment( int $order_id ) {
+
+        $ref = new Dotfiler_authnet_refund();
+        return $ref->get_payment( $order_id );
+
+    }
+
+    
 
 }
