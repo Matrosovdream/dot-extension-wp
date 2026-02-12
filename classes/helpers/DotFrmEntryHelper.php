@@ -269,4 +269,47 @@ class DotFrmEntryHelper {
         ];
     }
 
+    // Easypost shipments for an entry
+    public function getEntryShipments( int $entry_id ): array {
+
+        $model     = new FrmEasypostShipmentModel();
+        $shipments = $model->getAllByEntryId( $entry_id );
+  
+        // Collect stats
+        $stats = [
+          'total' => count( $shipments ),
+          'voided' => 0,
+          'refunded' => 0,
+          'delivered' => 0,
+          'active' => 0
+        ];
+  
+        foreach ( $shipments as $s ) {
+  
+          if ( isset( $s['status'] ) ) {
+            $status = strtolower( (string) $s['status'] );
+            if ( $status === 'voided' ) {
+              $stats['voided']++;
+            } elseif ( $status === 'delivered' ) {
+              $stats['delivered']++;
+            }
+  
+            if( $status !== 'voided' && empty( $s['refund_status'] ) ) {
+              $stats['active']++;
+            }
+  
+          }
+  
+          if ( ! empty( $s['refund_status'] ) ) {
+            $stats['refunded']++;
+          }
+  
+        }
+  
+        return [
+          'stats'     => $stats,
+          'shipments' => $shipments,
+        ];
+    }
+
 }
