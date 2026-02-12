@@ -32,6 +32,15 @@ final class DotFrmMassRefundShortcode_Simple {
     private const AJAX_EDIT_LOAD  = 'dot_mrf_edit_load';
     private const AJAX_EDIT_SAVE  = 'dot_mrf_edit_save';
 
+    // Status → color class (keep keys exactly as your status values)
+    private const STATUS_COLOR_MAP = [
+        'Processing' => 'mrf-st--processing', // blue
+        'Issue'      => 'mrf-st--issue',      // red
+        'On Hold'    => 'mrf-st--hold',       // yellow
+        'Complete'   => 'mrf-st--complete',   // green
+    ];
+
+
     private $helper;
 
     public function __construct() {
@@ -67,6 +76,7 @@ final class DotFrmMassRefundShortcode_Simple {
         $refs = $this->helper->getSelectRefs($form_id);
         $status_values = $refs['status'] ?? [];
         $amount_type   = $refs['amount_type'] ?? [];
+        $orderStatusRef = $this->helper->getOrderRefStatuses();
 
         $filters = [];
 
@@ -122,10 +132,11 @@ final class DotFrmMassRefundShortcode_Simple {
                     <!-- your updated block -->
                     <div style="display:flex; gap:8px; align-items:center;">
                         <select id="mrfF1StatusVal" style="height:34px; border:1px solid #d0d7de; border-radius:8px; padding:0 10px;">
-                            <option></option>
-                            <option value="Refunded">Refunded</option>
-                            <option value="Refund Requested">Refund Requested</option>
-                            <option value="Refund Complete">Refund Complete</option>
+                            <?php foreach (($orderStatusRef['values'] ?? []) as $value=>$label): ?>
+                                <option value="<?php echo esc_attr($value); ?>">
+                                    <?php echo esc_html($label ?: $value); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                         <button class="faip-btn" id="mrfBulkF1Status" disabled>Update Order Status</button>
                     </div>
@@ -209,7 +220,7 @@ final class DotFrmMassRefundShortcode_Simple {
                     <th style="width:34px;"><input type="checkbox" id="mrfCheckAll"></th>
                     <th style="width:120px;">Order #</th>
                     <th style="width:170px;">Date Created</th>
-                    <th style="width:260px;">Reason</th>
+                    <th style="width: 500px;">Reason</th>
                     <th style="width:160px;">Status</th>
                     <th style="width:160px;">Amount</th>
                     <th style="width:280px;">Actions</th>
@@ -309,7 +320,11 @@ final class DotFrmMassRefundShortcode_Simple {
             $order    = $row['order'] ?? [];
             $order_status = $order['field_values']['status'] ?? '';
             $order_notes = $order['field_values']['notes'] ?? '';
+            $order_shipments = $order['shipments'] ?? [ 'stats' => [ 'total' => 0 ] ];
+            $order_payment = $order['payment'] ?? [];
             $refund_history = $order['refund_history'] ?? [];
+
+            $similar_refunds = $row['similar_refunds'] ?? [];
             ?>
             
             <tr data-refund-row="<?php echo esc_attr($refund_id); ?>"
@@ -321,13 +336,19 @@ final class DotFrmMassRefundShortcode_Simple {
     
                 <td>
                     <b><?php echo esc_html($order_id); ?></b>
+
                     <div class="faip-muted">
                         Refund #<?php echo esc_html($refund_id); ?>
                     </div>
+
                 </td>
     
                 <td>
                     <?php echo esc_html($row['created_at'] ?? ''); ?>
+                    <div class="faip-muted" style="margin-top:4px;">
+                        Order created at: <br/>
+                        <?php echo esc_html($order['created_at'] ?? ''); ?>
+                    </div>
                 </td>
     
                 <td data-col="reason">
@@ -349,12 +370,44 @@ final class DotFrmMassRefundShortcode_Simple {
 
                     <?php } ?>
 
+                    <?php if( $order_shipments['stats']['total'] != 0 ) { ?>
+
+                        <div class="ffda-labels-cell small" style="margin-top:10px;">
+
+                            <p><b>Order Labels:</b></p>
+
+                            <p>
+                                Active: 
+                                <strong>
+                                    <?php echo esc_html( $order_shipments['stats']['active'] ?? '0' ); ?>
+                                </strong>
+                            </p>
+
+                            <button type="button"
+                                class="faip-btn ffda-show-shipments">
+                                Show all
+                            </button>
+
+                            <div class="easypost-shipments-container" style="display:none;">    
+                                <?php echo do_shortcode('[easypost-shipments entry=' . $order_id . ']'); ?>
+                            </div>
+
+                        </div>
+
+                    <?php } ?>
+
                 </td>
     
                 <td data-col="status">
-                    <div class="mrf-status-text">
-                        <?php echo esc_html($values['status'] ?? ''); ?>
+                    <?php
+                    $st = (string)($values['status'] ?? '');
+                    $st_key = trim($st);
+                    $st_class = self::STATUS_COLOR_MAP[$st_key] ?? 'mrf-st--default';
+                    ?>
+                    <div class="mrf-status-text <?php echo esc_attr($st_class); ?>">
+                        <?php echo esc_html($st); ?>
                     </div>
+
                     <div class="mrf-status-note" style="margin-top:6px;"></div>
 
                     <!-- Order status could go here -->
@@ -376,17 +429,29 @@ final class DotFrmMassRefundShortcode_Simple {
                 <td data-col="amount">
                     <b>
                         <span class="mrf-amount-val">
-                            <?php echo esc_html($values['amount'] ?? ''); ?>
-                        </span>$
+                            <?php echo $values['amount']; ?>$
+                        </span>
                         /
-                        <?php echo esc_html($order_sum); ?>$
+                        <?php echo $refund_history['full_amount']; ?>$
                     </b>
                     <!-- Refund history could go here -->
                     <?php if ( ! empty( $refund_history ) ) : ?>
                         <div class="mrf-refund-history" style="margin-top:6px; font-size:12px; color:#555;">
-                            Refunded: <?php echo esc_html( $refund_history['refunded_amount'] ?? '0.00' ); ?>$ of <?php echo esc_html( $refund_history['full_amount'] ?? '0.00' ); ?>$
+                            Refunded: 
+                            <?php echo esc_html( $refund_history['refunded_amount'] ?? '0.00' ); ?>$ of 
+                            <?php echo esc_html( $refund_history['full_amount'] ?? '0.00' ); ?>$
                         </div>
                     <?php endif; ?>
+
+                    <?php if ( ! empty($similar_refunds['count']) && $similar_refunds['count'] > 0 ): ?>
+                        <div style="margin-top:6px;">
+                            <span class="mrf-status-text mrf-st--issue">Similar refunds</span>
+                            <div class="faip-muted" style="margin-top:4px; font-size:12px;">
+                                <?php echo esc_html( implode(', ', $similar_refunds['item_ids']) ); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
                 </td>
     
                 <td>
@@ -620,6 +685,25 @@ final class DotFrmMassRefundShortcode_Simple {
                 background: #fafafa;
                 white-space: pre-line;
             }
+            .ffda-labels-cell p {
+                margin: 0;
+            }
+            /* status colors */
+            .mrf-status-text{
+            display:inline-block;
+            padding:4px 10px;
+            border-radius:999px;
+            border:1px solid #d0d7de;
+            font-size:12px;
+            font-weight:700;
+            line-height:1.2;
+            }
+            .mrf-st--processing{ background:#e7f1ff; border-color:#8cb6ff; color:#0b4aa2; } /* blue */
+            .mrf-st--issue{      background:#ffe8e8; border-color:#ff9b9b; color:#a10f0f; } /* red */
+            .mrf-st--hold{       background:#fff6d6; border-color:#ffd36b; color:#7a5a00; } /* yellow */
+            .mrf-st--complete{   background:#e8ffef; border-color:#8fe0a6; color:#116329; } /* green */
+            .mrf-st--default{    background:#f6f8fa; border-color:#d0d7de; color:#57606a; }
+
         ');
     
         wp_enqueue_script('jquery');
@@ -802,11 +886,17 @@ final class DotFrmMassRefundShortcode_Simple {
 
       // Toggle "Order Note" per row (only affects the clicked row)
         $(document).on('click', '.ffda-note-btn', function(e){
-        e.preventDefault();
-        var $wrap = $(this).closest('.ffda-note-wrap');
-        $wrap.find('.ffda-note-text').first().toggle();
+            e.preventDefault();
+            var $wrap = $(this).closest('.ffda-note-wrap');
+            $wrap.find('.ffda-note-text').first().toggle();
         });
 
+        // Toggle "Show all" shipments per row
+        $(document).on('click', '.ffda-show-shipments', function(e){
+            e.preventDefault();
+            var $wrap = $(this).closest('.ffda-labels-cell');
+            $wrap.find('.easypost-shipments-container').first().toggle();
+        });
     
       $(document).on('click','[data-mrf-edit]', function(e){
         e.preventDefault();
