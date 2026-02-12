@@ -55,6 +55,7 @@ class DotFrmMassRefundHelper {
 
         if( $order_id ) {
             $item['order'] = $this->getOriginalOrder( $order_id );
+            $item['order']['refund_history'] = $this->getOrderRefundHistory( $order_id );
         }
 
         return $item;
@@ -77,6 +78,7 @@ class DotFrmMassRefundHelper {
             'status' => $metas[7] ?? null,
             'payment_sum' => $metas[148] ?? null,
             'payment_card' => $metas[120] ?? null,
+            'notes' => $metas[5] ?? null,
         ];
 
         unset( $entry['metas'] );
@@ -90,6 +92,14 @@ class DotFrmMassRefundHelper {
         $entryRaw = FrmEntry::getOne( $entry_id, true );
         $entry = json_decode( json_encode( $entryRaw ), true );
         return $entry;
+    }
+
+    public function getOrderRefundHistory( int $order_id ): array {
+
+        $ref = new Dotfiler_authnet_refund();
+        $payment = $ref->get_payment( $order_id );
+        return $payment;
+
     }
 
      /**
