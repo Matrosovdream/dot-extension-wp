@@ -87,6 +87,14 @@ final class DotFrmMassRefundShortcode_Simple {
 
         $list = $this->helper->getList($filters, $page, $paginate = $per_page, $form_id);
 
+
+        if( isset( $_GET['lg'] ) ) {
+            echo "<pre>";
+            print_r($list['data']);
+            echo "</pre>";
+        }
+        
+
         $p = (array)($list['pagination'] ?? []);
         $cur_page = max(1, (int)($p['page'] ?? $page));
         $total_pages = max(1, (int)($p['total_pages'] ?? 1));
@@ -282,60 +290,139 @@ final class DotFrmMassRefundShortcode_Simple {
 
     /** ---------------- HTML ---------------- */
     private function render_rows_html(array $list): string {
+
         $items = isset($list['data']) && is_array($list['data']) ? $list['data'] : [];
+    
         if (!$items) {
             return '<tr><td colspan="9" class="faip-muted">No results.</td></tr>';
         }
-
-        $html = '';
-
+    
+        ob_start();
+    
         foreach ($items as $row) {
+    
             $refund_id = (int)($row['id'] ?? 0);
             $values    = $row['field_values'] ?? [];
             $order_sum = $row['order']['field_values']['payment_sum'] ?? 0.00;
-
+    
             $order_id = $values['order_id'] ?? '';
-
-            $html .= '
-              <tr data-refund-row="' . esc_attr($refund_id) . '"
-                  data-order-id="' . esc_attr($order_id) . '">
-
-                <td><input type="checkbox" data-refund-id="' . esc_attr($refund_id) . '"></td>
-
-                <td><b>' . esc_html($order_id) . '</b><div class="faip-muted">Refund #' . esc_html($refund_id) . '</div></td>
-
-                <td>' . esc_html(($row['created_at'] ?? '')) . '</td>
-
-                <td data-col="reason">' . esc_html(($values['refund_reason'] ?? '')) . '</td>
-
-                <td data-col="status">
-                    <div class="mrf-status-text">' . esc_html(($values['status'] ?? '')) . '</div>
-                    <div class="mrf-status-note" style="margin-top:6px;"></div>
-                </td>
-
-                <td data-col="amount">
-                    <b><span class="mrf-amount-val">' . esc_html(($values['amount'] ?? '')) . '</span>$ / ' . esc_html($order_sum) . '$</b>
-                </td>
-
+            $order    = $row['order'] ?? [];
+            $order_status = $order['field_values']['status'] ?? '';
+            $order_notes = $order['field_values']['notes'] ?? '';
+            $refund_history = $order['refund_history'] ?? [];
+            ?>
+            
+            <tr data-refund-row="<?php echo esc_attr($refund_id); ?>"
+                data-order-id="<?php echo esc_attr($order_id); ?>">
+    
                 <td>
-                    <div class="mrf-actions-wrap" style="display:flex; flex-direction:column; gap:8px;">
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <a href="/orders/entry/' . esc_attr($order_id) . '" target="_blank">
-                                <button class="faip-btn" type="button">Open order</button>
-                            </a>
-
-                            <button class="faip-btn" type="button" data-mrf-edit="' . esc_attr($refund_id) . '">Edit refund</button>
-                        </div>
-
-                        <div class="mrf-under-actions" data-under-actions="' . esc_attr($refund_id) . '"></div>
+                    <input type="checkbox" data-refund-id="<?php echo esc_attr($refund_id); ?>">
+                </td>
+    
+                <td>
+                    <b><?php echo esc_html($order_id); ?></b>
+                    <div class="faip-muted">
+                        Refund #<?php echo esc_html($refund_id); ?>
                     </div>
                 </td>
-              </tr>
-            ';
-        }
+    
+                <td>
+                    <?php echo esc_html($row['created_at'] ?? ''); ?>
+                </td>
+    
+                <td data-col="reason">
 
-        return $html;
+                    <?php echo esc_html($values['refund_reason'] ?? ''); ?>
+
+                    <!-- Order notes could go here -->
+                    <?php if( $order_notes != '' ) { ?>
+                        
+                        <div class="ffda-note-wrap mt-2">  
+                            <button type="button" class="btn btn-link p-0 ffda-note-btn" aria-label="Note" title="Note">    
+                                <span class="ffda-note-icon">📝</span>
+                                <span class="ffda-note-label">Order Note</span>  
+                            </button>  
+                            <div class="ffda-note-text" style="display:none;">
+                                <?php echo nl2br(esc_html( $order_notes )); ?>
+                            </div>
+                        </div>
+
+                    <?php } ?>
+
+                </td>
+    
+                <td data-col="status">
+                    <div class="mrf-status-text">
+                        <?php echo esc_html($values['status'] ?? ''); ?>
+                    </div>
+                    <div class="mrf-status-note" style="margin-top:6px;"></div>
+
+                    <!-- Order status could go here -->
+                    <?php if( $order_status != '' ) { ?>
+                        <div class="mrf-order-status" style="margin-top:6px; font-size:12px; color:#555; font-weight: bold;">
+                            Order status: 
+                            <?php if( $order_status == 'Refunded' ) { ?>
+                                <span style="color:red; font-weight: bold;">
+                                    <?php echo esc_html( $order_status ); ?>
+                                </span>
+                            <?php } else { ?>    
+                                <?php echo $order_status; ?>
+                            <?php } ?>
+                        </div>
+                    <?php } ?> 
+
+                </td>
+    
+                <td data-col="amount">
+                    <b>
+                        <span class="mrf-amount-val">
+                            <?php echo esc_html($values['amount'] ?? ''); ?>
+                        </span>$
+                        /
+                        <?php echo esc_html($order_sum); ?>$
+                    </b>
+                    <!-- Refund history could go here -->
+                    <?php if ( ! empty( $refund_history ) ) : ?>
+                        <div class="mrf-refund-history" style="margin-top:6px; font-size:12px; color:#555;">
+                            Refunded: <?php echo esc_html( $refund_history['refunded_amount'] ?? '0.00' ); ?>$ of <?php echo esc_html( $refund_history['full_amount'] ?? '0.00' ); ?>$
+                        </div>
+                    <?php endif; ?>
+                </td>
+    
+                <td>
+                    <div class="mrf-actions-wrap" style="display:flex; flex-direction:column; gap:8px;">
+    
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    
+                            <a href="/orders/entry/<?php echo esc_attr($order_id); ?>" target="_blank">
+                                <button class="faip-btn" type="button">
+                                    Open order
+                                </button>
+                            </a>
+    
+                            <button class="faip-btn"
+                                    type="button"
+                                    data-mrf-edit="<?php echo esc_attr($refund_id); ?>">
+                                Edit refund
+                            </button>
+    
+                        </div>
+    
+                        <div class="mrf-under-actions"
+                             data-under-actions="<?php echo esc_attr($refund_id); ?>">
+                        </div>
+    
+                    </div>
+                </td>
+    
+            </tr>
+    
+            <?php
+        }
+    
+        return ob_get_clean();
     }
+    
 
     private function footer_count_text(array $list): string {
         $p = (array)($list['pagination'] ?? []);
@@ -523,6 +610,16 @@ final class DotFrmMassRefundShortcode_Simple {
             .mrf-modal__foot{display:flex;justify-content:flex-end;gap:10px;padding:16px;border-top:1px solid #eee}
             .mrf-x{border:0;background:transparent;font-size:28px;line-height:1;cursor:pointer;padding:0 6px}
             .mrf-muted{color:#6a737d}
+            .ffda-note-text {
+                margin-top: 6px;
+                font-size: 12px;
+                line-height: 1.35;
+                padding: 8px 10px;
+                border: 1px solid #eee;
+                border-radius: 8px;
+                background: #fafafa;
+                white-space: pre-line;
+            }
         ');
     
         wp_enqueue_script('jquery');
@@ -702,6 +799,14 @@ final class DotFrmMassRefundShortcode_Simple {
           });
         }
       }
+
+      // Toggle "Order Note" per row (only affects the clicked row)
+        $(document).on('click', '.ffda-note-btn', function(e){
+        e.preventDefault();
+        var $wrap = $(this).closest('.ffda-note-wrap');
+        $wrap.find('.ffda-note-text').first().toggle();
+        });
+
     
       $(document).on('click','[data-mrf-edit]', function(e){
         e.preventDefault();
