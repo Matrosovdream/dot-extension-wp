@@ -2,7 +2,7 @@
 
 class FrmAutoresponderHelpers {
 
-    public static function triggerEntryWithAction( int $entry_id, int $action_id ) {
+    public static function triggerEntryWithAction( int $entry_id, int $action_id, bool $force = false ) {
 
         $entry = FrmEntry::getOne( $entry_id, true );
 
@@ -11,20 +11,24 @@ class FrmAutoresponderHelpers {
 
         // Check conditional logic.
         $stop = FrmFormAction::action_conditions_met( $action, $entry );
+
+        // If force is true, skip conditional logic check.
+        if ( $force ) {
+            $stop = false;
+        }
+
         if ( !$stop ) {
             $entry->is_draft = 0;
-
             FrmAutoresponderAppController::trigger_autoresponder( $entry, $action );
         } 
 
     }
 
-    public static function triggerEntryWithActions( int $entry_id, array $actions ) {
+    public static function triggerEntryWithActions( int $entry_id, array $actions, bool $force = false ): void {
 
         foreach ( $actions as $action_id ) {
-            self::triggerEntryWithAction( $entry_id, $action_id );
+            self::triggerEntryWithAction( $entry_id, $action_id, $force );
         }
-
 
     }
 
