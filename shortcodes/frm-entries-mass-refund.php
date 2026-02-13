@@ -40,6 +40,27 @@ final class DotFrmMassRefundShortcode_Simple {
         'Complete'   => 'mrf-st--complete',   // green
     ];
 
+    /**
+     * Time windows are computed in PST/PDT (America/Los_Angeles) at 14:30.
+     * Option values must be "from:to" (both as "Y-m-d H:i:s" in UTC).
+     */
+    private const TIME_TZ_LA = 'America/Los_Angeles';
+
+    private const TIME_WINDOWS = [
+        'between_3' => [
+            'label' => 'Between 3:00PM–3:00PM',
+            'rule'  => 'between_3',
+        ],
+        'before_yesterday_3' => [
+            'label' => 'Before 3:00PM Yesterday',
+            'rule'  => 'before_yesterday_3',
+        ],
+        'after_today_3' => [
+            'label' => 'After 3:00PM Today',
+            'rule'  => 'after_today_3',
+        ],
+    ];
+      
 
     private $helper;
 
@@ -94,6 +115,14 @@ final class DotFrmMassRefundShortcode_Simple {
                 'compare'  => '=',
             ];
         }
+        if( !empty($time) ) {
+            //[$fromUtc, $toUtc] = array_map('trim', explode('/', $time));
+            $filters[] = [
+                'field_id' => 'created_at',
+                'value'    => $time,
+                'compare'  => 'between_time',
+            ];
+        }
 
         $list = $this->helper->getList($filters, $page, $paginate = $per_page, $form_id);
 
@@ -110,6 +139,9 @@ final class DotFrmMassRefundShortcode_Simple {
         $total_pages = max(1, (int)($p['total_pages'] ?? 1));
 
         $base_url = $this->current_url_without([ self::QP_PAGE ]);
+
+        // Show wp time now
+        echo '<div style="margin-bottom:10px; font-size:12px; color:#666;">WP Time Now: ' . esc_html(current_time('Y-m-d H:i:s')) . '</div>';
 
         ob_start();
         ?>
@@ -171,13 +203,29 @@ final class DotFrmMassRefundShortcode_Simple {
                 </div>
 
                 <div class="faip-filter">
-                    <label>Time window (2:30PM PST)</label>
+                    <label>Time window (3:00PM, WP Time Now)</label>
+                    <?php
+                    // current selection from GET is still the KEY (between_230 / before_yesterday_230 / after_today_230)
+                    $time_key = isset($_GET[self::QP_TIME]) ? sanitize_text_field((string)$_GET[self::QP_TIME]) : '';
+                    ?>
                     <select name="<?php echo esc_attr(self::QP_TIME); ?>">
-                        <option value="" <?php selected($time, ''); ?>>All</option>
-                        <option value="between_230" <?php selected($time, 'between_230'); ?>>Between 2:30PM–2:30PM</option>
-                        <option value="before_yesterday_230" <?php selected($time, 'before_yesterday_230'); ?>>Before 2:30PM Yesterday</option>
-                        <option value="after_today_230" <?php selected($time, 'after_today_230'); ?>>After 2:30PM Today</option>
+                        <option value="" <?php selected($time_key, ''); ?>>All</option>
+
+                        <?php foreach (self::TIME_WINDOWS as $k => $cfg): ?>
+                            <?php
+                            $calc = $this->calc_time_window_utc($k);
+                            if (!$calc) { continue; }
+                            [$fromUtc, $toUtc, $label] = $calc;
+
+                            // IMPORTANT: value is from:to
+                            $val = $fromUtc . ' / ' . $toUtc;
+                            ?>
+                            <option value="<?php echo esc_attr($val); ?>" <?php selected($time_key, $val); ?>>
+                                <?php echo esc_html($label); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
+
                 </div>
 
                 <div class="faip-filter">
@@ -533,9 +581,12 @@ final class DotFrmMassRefundShortcode_Simple {
         $this->guard_ajax();
 
         $refund_id = isset($_POST['refund_id']) ? (int)$_POST['refund_id'] : 0;
+        $order_id  = isset($_POST['order_id']) ? sanitize_text_field((string)$_POST['order_id']) : '';
         if ($refund_id <= 0) wp_send_json([ 'ok'=>false,'error'=>'Missing refund_id' ], 400);
 
-        wp_send_json([ 'ok' => true, 'msg' => 'Email flag set' ]);
+        $this->helper->sendRefundEmail( $refund_id );
+
+        wp_send_json([ 'ok' => true, 'msg' => 'Email is sent' ]);
     }
 
     public function ajax_bulk_f1status(): void {
@@ -1006,6 +1057,67 @@ final class DotFrmMassRefundShortcode_Simple {
     private function add_query_arg_safe(string $url, string $key, string $value): string {
         return add_query_arg([ $key => $value ], $url);
     }
+
+    /**
+     * Returns [fromUtc, toUtc, label] or null if unknown key.
+     *
+     * All calculations are based on WP timezone (WP Time Now).
+     * Anchor time is 3:00PM (15:00) in WP timezone.
+     *
+     * Windows:
+     * - Between 3PM–3PM:     yesterday 3PM -> today 3PM
+     * - Before 3PM Yesterday: (any date)   -> yesterday 3PM
+     * - After 3PM Today:      today 3PM    -> (now)
+     */
+    private function calc_time_window_utc(string $key): ?array {
+
+        if (!isset(self::TIME_WINDOWS[$key])) {
+            return null;
+        }
+
+        // WP timezone (site setting). This is the timezone used by current_time().
+        $wpTzStr = function_exists('wp_timezone_string') ? wp_timezone_string() : 'UTC';
+        $tz = new DateTimeZone($wpTzStr ?: 'UTC');
+
+        $now        = new DateTimeImmutable('now', $tz);
+        $today3     = $now->setTime(15, 0, 0); // today 3:00PM
+        $yesterday3 = $today3->sub(new DateInterval('P1D'));
+
+        $toUtcStr = static function (DateTimeImmutable $dt): string {
+            return $dt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+        };
+
+        $rule  = (string) (self::TIME_WINDOWS[$key]['rule'] ?? '');
+        $label = (string) (self::TIME_WINDOWS[$key]['label'] ?? '');
+
+        // Between 3PM–3PM: yesterday 3PM -> today 3PM
+        if ($rule === 'between_3') {
+            $from = $yesterday3;
+            $to   = $today3;
+            return [ $toUtcStr($from), $toUtcStr($to), $label ];
+        }
+
+        // Before 3PM Yesterday: (any date) -> yesterday 3PM
+        if ($rule === 'before_yesterday_3') {
+            // Open start: pick a very early date so SQL BETWEEN works.
+            $from = new DateTimeImmutable('1970-01-01 00:00:00', $tz);
+            $to   = $yesterday3;
+            return [ $toUtcStr($from), $toUtcStr($to), $label ];
+        }
+
+        // After 3PM Today: today 3PM -> now (bounded)
+        if ($rule === 'after_today_3') {
+            $from = $today3;
+            $to   = $now;
+            return [ $toUtcStr($from), $toUtcStr($to), $label ];
+        }
+
+        return null;
+    }
+
+
+
+
 }
 
 add_action('init', function(){
