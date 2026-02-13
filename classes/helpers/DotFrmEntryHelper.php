@@ -132,65 +132,83 @@ class DotFrmEntryHelper {
         int $paginate = 20,
         int $form_id
     ): array {
-
+    
         global $wpdb;
-
+    
         $items_table = $wpdb->prefix . 'frm_items';
         $metas_table = $wpdb->prefix . 'frm_item_metas';
-
-        $page     = max(1, (int)$page);
-        $paginate = max(1, (int)$paginate);
+    
+        $page     = max(1, (int) $page);
+        $paginate = max(1, (int) $paginate);
         $offset   = ($page - 1) * $paginate;
-
+    
         $form_id = (int) $form_id;
         if ($form_id <= 0) {
-            return [
-                'ok' => false,
-                'error' => 'Invalid form_id',
-            ];
+            return ['ok' => false, 'error' => 'Invalid form_id'];
         }
-
-        $where = [ 'i.form_id = %d' ];
-        $args  = [ $form_id ];
-
+    
+        $where = ['i.form_id = %d'];
+        $args  = [$form_id];
+    
         foreach ($filters as $filter) {
-
             if (!is_array($filter)) { continue; }
             if (empty($filter['field_id']) || !array_key_exists('value', $filter)) { continue; }
-
+    
             $field_id = (int) $filter['field_id'];
             if ($field_id <= 0) { continue; }
-
-            $value   = (string) $filter['value'];
-            $compare = $filter['compare'] ?? '=';
-
-            if (!in_array($compare, ['=', '!=', '%', '%%'], true)) {
+    
+            $compare = strtoupper((string)($filter['compare'] ?? '='));
+            $allowed = ['=', '!=', '%', '%%', 'IN', 'NOT IN'];
+            if (!in_array($compare, $allowed, true)) {
                 $compare = '=';
             }
-
+    
+            // Build condition for meta_value + args
+            $cmp_sql  = '';
+            $cmp_args = [];
+    
             switch ($compare) {
                 case '=':
-                    $cmp_sql = "m.meta_value = %s";
-                    $cmp_val = $value;
+                    $cmp_sql  = "m.meta_value = %s";
+                    $cmp_args = [(string) $filter['value']];
                     break;
-
+    
                 case '!=':
-                    $cmp_sql = "m.meta_value <> %s";
-                    $cmp_val = $value;
+                    $cmp_sql  = "m.meta_value <> %s";
+                    $cmp_args = [(string) $filter['value']];
                     break;
-
+    
                 case '%':
-                    $cmp_sql = "m.meta_value LIKE %s";
-                    $cmp_val = $wpdb->esc_like($value) . '%';
+                    $cmp_sql  = "m.meta_value LIKE %s";
+                    $cmp_args = [$wpdb->esc_like((string) $filter['value']) . '%'];
                     break;
-
+    
                 case '%%':
-                default:
-                    $cmp_sql = "m.meta_value LIKE %s";
-                    $cmp_val = '%' . $wpdb->esc_like($value) . '%';
+                    $cmp_sql  = "m.meta_value LIKE %s";
+                    $cmp_args = ['%' . $wpdb->esc_like((string) $filter['value']) . '%'];
+                    break;
+    
+                case 'IN':
+                case 'NOT IN':
+                    $vals = $filter['value'];
+    
+                    // Must be a non-empty array
+                    if (!is_array($vals) || !$vals) { continue; }
+    
+                    // Normalize values as strings (meta_value is stored as text)
+                    $vals = array_values(array_filter(array_map(
+                        static fn($v) => (string) $v,
+                        $vals
+                    ), static fn($v) => $v !== ''));
+    
+                    if (!$vals) { continue; }
+    
+                    $ph = implode(',', array_fill(0, count($vals), '%s'));
+                    $cmp_sql  = "m.meta_value {$compare} ({$ph})";
+                    $cmp_args = $vals;
                     break;
             }
-
+    
             $where[] = "
                 EXISTS (
                     SELECT 1
@@ -200,26 +218,24 @@ class DotFrmEntryHelper {
                       AND {$cmp_sql}
                 )
             ";
-
+    
             $args[] = $field_id;
-            $args[] = $cmp_val;
+            foreach ($cmp_args as $a) {
+                $args[] = $a;
+            }
         }
-
+    
         $where_sql = implode(' AND ', $where);
-
-        /**
-         * Total count
-         */
+    
+        // Total count
         $total = (int) $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM {$items_table} i WHERE {$where_sql}",
                 $args
             )
         );
-
-        /**
-         * Items
-         */
+    
+        // Items
         $items_sql = "
             SELECT i.*
             FROM {$items_table} i
@@ -227,12 +243,12 @@ class DotFrmEntryHelper {
             ORDER BY i.id DESC
             LIMIT %d OFFSET %d
         ";
-
+    
         $items = $wpdb->get_results(
-            $wpdb->prepare($items_sql, array_merge($args, [ $paginate, $offset ])),
+            $wpdb->prepare($items_sql, array_merge($args, [$paginate, $offset])),
             ARRAY_A
         );
-
+    
         if (!$items) {
             return [
                 'ok' => true,
@@ -245,21 +261,17 @@ class DotFrmEntryHelper {
                 ],
             ];
         }
-
-        /**
-         * Load metas
-         */
-        $item_ids = array_values(array_unique(array_map(fn($i) => (int)$i['id'], $items)));
-        $placeholders = implode(',', array_fill(0, count($item_ids), '%d'));
-
-        $items = [];
-        foreach ($item_ids as $k => $id) {
-            $items[] = $this->getEntryById($id);
+    
+        $item_ids = array_values(array_unique(array_map(static fn($i) => (int) $i['id'], $items)));
+    
+        $out = [];
+        foreach ($item_ids as $id) {
+            $out[] = $this->getEntryById($id);
         }
-
+    
         return [
             'ok' => true,
-            'data' => $items,
+            'data' => $out,
             'pagination' => [
                 'page' => $page,
                 'per_page' => $paginate,
@@ -268,6 +280,7 @@ class DotFrmEntryHelper {
             ],
         ];
     }
+    
 
     // Easypost shipments for an entry
     public function getEntryShipments( int $entry_id ): array {
@@ -311,5 +324,82 @@ class DotFrmEntryHelper {
           'shipments' => $shipments,
         ];
     }
+
+    /**
+     * Get entry IDs from a given Formidable form
+     * where:
+     *  - created_at <= $dateLimit
+     *  - not draft
+     *  - and referenced via another entry meta field (field_id = $fieldId)
+     *
+     * @param int    $formId     Form ID to filter (e.g. 1)
+     * @param string $dateLimit  MySQL datetime string (Y-m-d H:i:s)
+     * @param int    $fieldId    Meta field that stores the reference (default 152)
+     *
+     * @return int[] Array of entry IDs
+     */
+    public function getEntryItemsConnWithMeta(
+        int $formId,
+        int $fieldId = 152,
+        string $operator = '>=',        // >= | <= | BETWEEN
+        string $dateFrom,
+        ?string $dateTo = null          // требуется только для BETWEEN
+    ): array {
+    
+        global $wpdb;
+    
+        $items = $wpdb->prefix . 'frm_items';
+        $metas = $wpdb->prefix . 'frm_item_metas';
+    
+        $allowedOperators = ['>=', '<=', 'BETWEEN'];
+    
+        if (!in_array($operator, $allowedOperators, true)) {
+            $operator = '>=';
+        }
+    
+        $whereDate = '';
+        $args = [$formId];
+    
+        if ($operator === 'BETWEEN') {
+    
+            if (!$dateTo) {
+                return [];
+            }
+    
+            $whereDate = "i.created_at BETWEEN %s AND %s";
+            $args[] = $dateFrom;
+            $args[] = $dateTo;
+    
+        } else {
+    
+            $whereDate = "i.created_at {$operator} %s";
+            $args[] = $dateFrom;
+        }
+    
+        $sql = "
+            SELECT i.id
+            FROM {$items} i
+            WHERE i.form_id = %d
+            AND i.is_draft = 0
+            AND {$whereDate}
+            AND EXISTS (
+                SELECT 1
+                FROM {$metas} im
+                WHERE im.field_id = %d
+                  AND im.meta_value = CAST(i.id AS CHAR)
+            )
+            ORDER BY i.id DESC
+        ";
+    
+        $args[] = $fieldId;
+    
+        $prepared = $wpdb->prepare($sql, $args);
+    
+        $ids = $wpdb->get_col($prepared);
+    
+        return array_map('intval', $ids);
+    }
+    
+
 
 }
