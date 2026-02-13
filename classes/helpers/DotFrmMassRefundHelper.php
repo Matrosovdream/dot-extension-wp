@@ -153,6 +153,43 @@ class DotFrmMassRefundHelper {
     public function getList( array $filters, int $page = 1, int $paginate = 20, int $form_id ) {
 
         $helper = new DotFrmEntryHelper();
+
+        foreach( $filters as $index => $filter ) {
+
+            if( $filter['compare'] == 'between_time' ) {
+
+                [$fromTime, $toTime] = array_map('trim', explode('/', $filter['value']));
+
+                $form1_ids = $helper->getEntryItemsConnWithMeta(
+                    1,
+                    152,
+                    'BETWEEN',
+                    $fromTime,
+                    $toTime
+                );
+
+                if( empty( $form1_ids ) ) {
+                    // No matching entries
+                    return [
+                        'data' => [],
+                        'total' => 0,
+                        'page' => $page,
+                        'paginate' => $paginate,
+                    ];
+                }
+        
+                $filters[] = [
+                    'field_id' => self::FIELDS_MAP['order_id'],
+                    'value'    => $form1_ids,
+                    'compare'  => 'IN',
+                ];
+
+                unset( $filters[$index] );
+
+            }
+
+        }
+
         $res = $helper->getList( $filters, $page, $paginate, $form_id );
 
         $items = [];
@@ -232,6 +269,25 @@ class DotFrmMassRefundHelper {
 
     }
 
-    
+    public function sendRefundEmail( int $entry_id ): void {
+
+        /*
+         Run actions for Refund entry Id, Form 4
+         /wp-admin/admin.php?page=formidable&frm_action=settings&id=4 
+         DOESN'T WORK FOR SOME REASON
+        */
+        //$actions_run = [3547];
+	    //FrmAutoresponderHelpers::triggerEntryWithActions( $entry_id, $actions_run, true );
+
+        $entryHelper = new DotFrmEntryHelper();
+        $entryHelper->updateMetaField( 
+            $entry_id, 
+            158, 
+            array("PARTIAL Refund Processed")
+        );
+
+        do_action('frm_after_update_entry', $entry_id, $form_id=4);
+
+    }
 
 }
