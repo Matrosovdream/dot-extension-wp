@@ -10,8 +10,10 @@ final class DotFrmPhotosPageShortcode {
     private $helper;
 
     /** AJAX */
-    private const AJAX_ACTION_FIX = 'dot_frm_ai_fix_photo';
-    private const NONCE_ACTION    = 'dot_frm_ai_fix_photo_nonce';
+    private const AJAX_ACTION_FIX     = 'dot_frm_ai_fix_photo';
+    private const AJAX_ACTION_APPROVE = 'dot_frm_ai_approve_photo';
+    private const NONCE_ACTION        = 'dot_frm_ai_fix_photo_nonce';
+    
 
     /** GET params */
     private const QP_PAGE   = 'faip_page';
@@ -25,6 +27,8 @@ final class DotFrmPhotosPageShortcode {
 
         // AJAX handler (logged-in)
         add_action('wp_ajax_' . self::AJAX_ACTION_FIX, [ $this, 'ajax_ai_fix_photo' ]);
+        add_action('wp_ajax_' . self::AJAX_ACTION_APPROVE, [ $this, 'ajax_ai_approve_photo' ]);
+
     }
 
     public function render_shortcode($atts = []): string {
@@ -274,6 +278,14 @@ final class DotFrmPhotosPageShortcode {
             'nonce'    => wp_create_nonce(self::NONCE_ACTION),
             'action'   => self::AJAX_ACTION_FIX,
         ]);
+
+        wp_localize_script('dotfiler-ai-photos-page-js', 'FAIP_AJAX', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce(self::NONCE_ACTION),
+            'action'   => self::AJAX_ACTION_FIX,
+            'action_approve' => self::AJAX_ACTION_APPROVE,
+        ]);
+    
     }
 
     /**
@@ -354,6 +366,69 @@ final class DotFrmPhotosPageShortcode {
             ], 500);
         }
     }
+
+    public function ajax_ai_approve_photo(): void {
+
+        if ( ! is_user_logged_in() ) {
+            wp_send_json([ 'ok' => false, 'error' => 'Not logged in' ], 401);
+        }
+        if ( ! current_user_can('manage_options') ) {
+            wp_send_json([ 'ok' => false, 'error' => 'Forbidden' ], 403);
+        }
+    
+        $nonce = isset($_POST['nonce']) ? (string) $_POST['nonce'] : '';
+        if ( ! wp_verify_nonce($nonce, self::NONCE_ACTION) ) {
+            wp_send_json([ 'ok' => false, 'error' => 'Bad nonce' ], 403);
+        }
+    
+        $entry_id = isset($_POST['entry_id']) ? (int) $_POST['entry_id'] : 0;
+        $tmp_url  = isset($_POST['tmp_url']) ? esc_url_raw((string) $_POST['tmp_url']) : '';
+    
+        if ( $entry_id <= 0 ) {
+            wp_send_json([ 'ok' => false, 'error' => 'Missing entry_id' ], 400);
+        }
+        if ( $tmp_url === '' ) {
+            // JS должен не вызывать approve, если нет "Edit by AI",
+            // но на всякий случай — защищаемся
+            wp_send_json([ 'ok' => false, 'error' => 'Missing tmp_url' ], 400);
+        }
+    
+        try {
+            // (опционально) можно проверить что tmp_url реально указывает в ваш tmp каталог/домен
+            // и что файл существует:
+            $tmp_path = $this->url_to_local_path($tmp_url);
+            if ( ! $tmp_path || ! file_exists($tmp_path) ) {
+                wp_send_json([
+                    'ok' => false,
+                    'error' => 'tmp_url file not found',
+                    'tmp_url' => $tmp_url,
+                    'tmp_path' => (string) $tmp_path,
+                ], 400);
+            }
+    
+            $res = $this->helper->updateEntryImage($entry_id, [
+                'new_image_url' => $tmp_url,
+            ]);
+    
+            if (!is_array($res) || empty($res['ok'])) {
+                wp_send_json([
+                    'ok' => false,
+                    'error' => $res['error'] ?? 'updateEntryImage failed',
+                    'data' => $res,
+                ], 500);
+            }
+    
+            wp_send_json([
+                'ok' => true,
+                'entry_id' => $entry_id,
+                'data' => $res['data'] ?? [],
+            ]);
+    
+        } catch (\Throwable $e) {
+            wp_send_json([ 'ok' => false, 'error' => $e->getMessage() ], 500);
+        }
+    }
+    
 
     /**
      * Convert uploads URL -> local path (best effort)
@@ -477,7 +552,7 @@ final class DotFrmPhotosPageShortcode {
             $denyBtn = '<button class="faip-btn faip-btn-danger" data-action="deny" data-id="' . esc_attr($id) . '" type="button">Deny</button>';
 
             $html .= '
-              <tr data-row="' . esc_attr($id) . '">
+              <tr data-row="' . esc_attr($id) . '"  data-ai-tmp-url="">
                 <td><input type="checkbox" data-id="' . esc_attr($id) . '"></td>
                 <td><b>#' . esc_html((string)$orderId) . '</b></td>
                 <td>' . esc_html((string)$createdAt) . '</td>
