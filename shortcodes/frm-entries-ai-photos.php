@@ -139,17 +139,14 @@ final class DotFrmPhotosPageShortcode {
                         placeholder="e.g. 122751"
                         data-enter-submit="1"
                     />
-                    <div style="margin-top:6px;">
-                        <button type="submit">Apply</button>
-                    </div>
                 </div>
 
                 <!-- Reset -->
                 <div class="faip-filter" style="grid-column: span 2;">
                     <label>&nbsp;</label>
                     <div class="faip-inline">
+                        <button type="submit" class="faip-btn faip-btn-primary" id="mrfApplyFilters">Apply</button>
                         <a class="faip-btn" href="<?php echo esc_url($this->current_url_without([self::QP_PAGE, self::QP_STATUS, self::QP_Q])); ?>">Reset</a>
-                        <span class="faip-muted">Changes reload page automatically</span>
                     </div>
                 </div>
 
@@ -169,8 +166,8 @@ final class DotFrmPhotosPageShortcode {
                 <thead>
                 <tr>
                     <th style="width:34px;"><input type="checkbox" id="faipCheckAll"></th>
-                    <th style="width:110px;">Entry</th>
-                    <th style="width:200px;">Date</th>
+                    <th style="width:120px;">Order #</th>
+                    <th style="width:170px;">Date Created</th>
                     <th>Service</th>
                     <th style="width:200px;">Status</th>
                     <th>Original image</th>
@@ -499,6 +496,12 @@ final class DotFrmPhotosPageShortcode {
                 form_id: $form_id
             );
 
+            if( isset( $_GET['lg'] ) ) {
+                echo "<pre>";
+                print_r($list['data']);
+                echo "</pre>";
+            }
+
             return is_array($list) ? $list : [];
         } catch (\Throwable $e) {
             return [
@@ -526,59 +529,103 @@ final class DotFrmPhotosPageShortcode {
     private function render_rows_html(array $list, int $status_field_id): string {
 
         $items = isset($list['data']) && is_array($list['data']) ? $list['data'] : [];
+    
         if (empty($items)) {
             return '<tr><td colspan="8" class="faip-muted">No results.</td></tr>';
         }
-
-        $html = '';
-
+    
+        ob_start();
+    
         foreach ($items as $item) {
-
+    
             $id = 0;
-            if (is_array($item) && isset($item['id'])) $id = (int) $item['id'];
-            elseif (is_object($item) && isset($item->id)) $id = (int) $item->id;
-
+            if (is_array($item) && isset($item['id'])) {
+                $id = (int) $item['id'];
+            } elseif (is_object($item) && isset($item->id)) {
+                $id = (int) $item->id;
+            }
+    
             $fieldValues = $item['field_values'] ?? [];
 
-            $status = $fieldValues['status'] ?? '';
-            $createdAt =  date('Y-m-d H:i', strtotime( $item['created_at'] ?? 'now' ));
-            $orderId = $fieldValues['order_id'] ?? '';
-            $service = $fieldValues['service'] ?? '';
-            $email = $fieldValues['email'] ?? '';
+            $entryId = $id;
+    
+            $status           = $fieldValues['status'] ?? '';
+            $createdAtRaw     = $item['created_at'] ?? 'now';
+            $createdAt        = date('Y-m-d H:i', strtotime($createdAtRaw));
+            $orderId          = $fieldValues['order_id'] ?? '';
+            $service          = $fieldValues['service'] ?? '';
+            $email            = $fieldValues['email'] ?? '';
             $uploadedPhotoUrl = $fieldValues['uploaded_photo_url'] ?? '';
-            $finalPhotoUrl = $fieldValues['final_photo_url'] ?? '';
-
+            $finalPhotoUrl    = $fieldValues['final_photo_url'] ?? '';
+    
             $viewBtn = '<button class="faip-btn" data-action="view" data-id="' . esc_attr($id) . '" type="button">Open</button>';
             $denyBtn = '<button class="faip-btn faip-btn-danger" data-action="deny" data-id="' . esc_attr($id) . '" type="button">Deny</button>';
+            ?>
+    
+            <tr data-row="<?php echo esc_attr($id); ?>" data-ai-tmp-url="">
+                <td>
+                    <input type="checkbox" data-id="<?php echo esc_attr($id); ?>">
+                </td>
+    
+                <td>
+                    <b><?php echo esc_html($orderId); ?></b>
 
-            $html .= '
-              <tr data-row="' . esc_attr($id) . '"  data-ai-tmp-url="">
-                <td><input type="checkbox" data-id="' . esc_attr($id) . '"></td>
-                <td><b>#' . esc_html((string)$orderId) . '</b></td>
-                <td>' . esc_html((string)$createdAt) . '</td>
-                <td><b>' . esc_html((string)$service) . '</b><br>' . esc_html((string)$email) . '</td>
-                <td>' . esc_html((string)$status) . '</td>
-                <td>
-                  <img src="' . esc_url((string)$uploadedPhotoUrl) . '" alt="Original Image" class="original-image">
+                    <div class="faip-muted">
+                        Entry #<?php echo esc_html($id); ?>
+                    </div>
+
                 </td>
+    
                 <td>
-                  <div class="fixed-image-block">
-                    <img src="' . esc_url((string)$finalPhotoUrl) . '" alt="Final Image" class="final-image">
-                  </div>
-                  <div class="faip-ai-label-wrap"></div>
+                    <?php echo esc_html((string) $createdAt); ?>
                 </td>
+    
                 <td>
-                  <div class="faip-row-actions">
-                    ' . $viewBtn . '
-                    ' . $denyBtn . '
-                  </div>
+                    <b><?php echo esc_html((string) $service); ?></b><br>
+                    <?php echo esc_html((string) $email); ?>
                 </td>
-              </tr>
-            ';
+    
+                <td>
+                    <?php echo esc_html((string) $status); ?>
+                </td>
+    
+                <td>
+                    <?php if (!empty($uploadedPhotoUrl)) : ?>
+                        <img 
+                            src="<?php echo esc_url((string) $uploadedPhotoUrl); ?>" 
+                            alt="Original Image" 
+                            class="original-image"
+                        >
+                    <?php endif; ?>
+                </td>
+    
+                <td>
+                    <div class="fixed-image-block">
+                        <?php if (!empty($finalPhotoUrl)) : ?>
+                            <img 
+                                src="<?php echo esc_url((string) $finalPhotoUrl); ?>" 
+                                alt="Final Image" 
+                                class="final-image"
+                            >
+                        <?php endif; ?>
+                    </div>
+                    <div class="faip-ai-label-wrap"></div>
+                </td>
+    
+                <td>
+                    <div class="faip-row-actions">
+                        <?php echo $viewBtn; ?>
+                        <?php echo $denyBtn; ?>
+                    </div>
+                </td>
+            </tr>
+    
+            <?php
         }
-
-        return $html;
+    
+        return ob_get_clean();
     }
+    
 
     private function footer_count_text(array $list): string {
         $p = isset($list['pagination']) && is_array($list['pagination']) ? $list['pagination'] : [];
