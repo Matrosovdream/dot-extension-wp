@@ -52,8 +52,14 @@ class DotFrmPhotoEntryHelper {
             }
 
             if( $key === 'final_photo_id' && !empty( $fields[$key] ) ) {
-                $fields[$key] = $fields[$key][1];
-                $fields['final_photo_url'] = wp_get_attachment_url( (int)$fields[$key] );
+print_r($fields[$key]);
+                foreach( $fields[$key] as $k => $v ) {
+                    if( $v != '' ) {
+                        $fields[$key] = $v;
+                        break;
+                    }
+                }
+                $fields['final_photo_url'] = wp_get_attachment_url( $fields[$key] );
             }
 
         }
@@ -234,5 +240,70 @@ class DotFrmPhotoEntryHelper {
         return $helper->getSelectRefs($form_id, self::FIELD_SELECT_VALUES);
         
     }
+
+    public function updateEntryImage(int $entry_id, array $params = []): array {
+
+        $newUrl = isset($params['new_image_url']) ? (string) $params['new_image_url'] : '';
+        $newUrl = esc_url_raw($newUrl);
+    
+        if ($entry_id <= 0) {
+            return [ 'ok' => false, 'error' => 'Bad entry_id' ];
+        }
+        if ($newUrl === '') {
+            return [ 'ok' => false, 'error' => 'new_image_url is empty' ];
+        }
+
+        $entryHelper = new DotFrmEntryHelper();
+    
+        // 1) скачать в tmp файл
+        $tmp = download_url($newUrl);
+        if (is_wp_error($tmp)) {
+            return [ 'ok' => false, 'error' => 'download_url failed: ' . $tmp->get_error_message() ];
+        }
+    
+        // 2) подготовить файл для sideload
+        $name = wp_basename(parse_url($newUrl, PHP_URL_PATH) ?: ('ai-' . $entry_id . '.jpg'));
+        $file = [
+            'name'     => $name,
+            'type'     => mime_content_type($tmp) ?: 'image/jpeg',
+            'tmp_name' => $tmp,
+            'error'    => 0,
+            'size'     => filesize($tmp),
+        ];
+    
+        // 3) загрузить в WP media, привязать к entry_id
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+    
+        $attach_id = media_handle_sideload($file, $entry_id);
+    
+        // cleanup tmp file (если WP не удалил)
+        if (file_exists($tmp)) {
+            @unlink($tmp);
+        }
+    
+        if (is_wp_error($attach_id)) {
+            return [ 'ok' => false, 'error' => 'media_handle_sideload failed: ' . $attach_id->get_error_message() ];
+        }
+    
+        // 4) обновить meta field final_photo_id (668)
+        $fieldId = self::FIELDS_MAP['final_photo_id'] ?? 0;
+        if ((int)$fieldId <= 0) {
+            return [ 'ok' => false, 'error' => 'FIELDS_MAP final_photo_id missing' ];
+        }
+    
+        // ВАЖНО: тут предполагается что updateMetaField умеет принимать attachment_id
+        $entryHelper->updateMetaField($entry_id, $fieldId, [$attach_id]);
+    
+        return [
+            'ok' => true,
+            'data' => [
+                'attachment_id' => (int) $attach_id,
+                'new_image_url' => $newUrl,
+            ],
+        ];
+    }
+    
 
 }
