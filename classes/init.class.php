@@ -82,6 +82,12 @@ class Dotfiler_init {
         // Entries mass photo
         require_once DOTFILER_BASE_URL.'/shortcodes/frm-entries-mass-photo.php';
 
+        // Entries AI photos
+        require_once DOTFILER_BASE_URL.'/shortcodes/frm-entries-ai-photos.php';
+
+        // Entries mass refund
+        require_once DOTFILER_BASE_URL.'/shortcodes/frm-entries-mass-refund.php';
+
 
     }
 
@@ -94,11 +100,17 @@ class Dotfiler_init {
         // Page CSS/JS scripts
         require_once DOTFILER_BASE_URL.'/actions/page.php';
 
+        // Frm
+        require_once DOTFILER_BASE_URL.'/actions/entry/frm_after_create_entry.php';
+
     }
 
     private function include_helpers() {
 
         require_once DOTFILER_BASE_URL.'/classes/helpers/DotFrmEntryHelper.php';
+        require_once DOTFILER_BASE_URL.'/classes/helpers/DotFrmPhotoEntryHelper.php';
+        require_once DOTFILER_BASE_URL.'/classes/helpers/DotFrmMassRefundHelper.php';
+        require_once DOTFILER_BASE_URL.'/classes/helpers/DotFrmOrderHelper.php';
 
     }
 
