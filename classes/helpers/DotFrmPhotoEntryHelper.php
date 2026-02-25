@@ -19,6 +19,10 @@ class DotFrmPhotoEntryHelper {
                     'label' => 'Passport Type',
                     'field_id' => 330
                 ],
+                'deny_reason' => [
+                    'label' => 'Deny Reason',
+                    'field_id' => 776
+                ]
             ]
         ]
     ];
@@ -26,10 +30,14 @@ class DotFrmPhotoEntryHelper {
     private const FIELDS_MAP = [
         'order_id' => 194,
         'status' => 193,
+        'notes' => 257,
         'service' => 330,
         'email' => 664,
+        'email_client' => 662,
+        'message_addon' => 663,
         'uploaded_photo_id' => 215,
         'final_photo_id' => 668,
+        'deny_reasons' => 776
     ];
 
     /**
@@ -52,7 +60,7 @@ class DotFrmPhotoEntryHelper {
             }
 
             if( $key === 'final_photo_id' && !empty( $fields[$key] ) ) {
-print_r($fields[$key]);
+
                 foreach( $fields[$key] as $k => $v ) {
                     if( $v != '' ) {
                         $fields[$key] = $v;
@@ -304,6 +312,128 @@ print_r($fields[$key]);
             ],
         ];
     }
+
+    public function denyEntry(int $entry_id, string $order_id, array $messages): array {
+
+        $entryHelper = new DotFrmEntryHelper();
+
+        if ($entry_id <= 0) return [ 'ok' => false, 'error' => 'Bad entry_id' ];
+        if (empty($messages)) return [ 'ok' => false, 'error' => 'Empty messages' ];
+
+        // Add checkmarks
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['email_client'], [
+            'Photo Denied',
+            'Add Message',
+        ]);
+
+        // Add deny reasons
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['deny_reasons'], $messages);
+
+        // Add message
+        //$entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['message_addon'], $message);
     
+        return [ 'ok' => true, 'data' => [ 'entry_id' => $entry_id, 'order_id' => $order_id ] ];
+    }
+
+    public function updateEntryStatus(int $entry_id, string $status): array {
+
+        $entryHelper = new DotFrmEntryHelper();
+
+        // Update status
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['status'], $status);
+    
+        return [ 'ok' => true, 'data' => [ 'entry_id' => $entry_id, 'status' => $status ] ];
+
+    }
+
+    public function updateEntryNotes(int $entry_id, string $notes): array {
+
+        $entryHelper = new DotFrmEntryHelper();
+
+        // Update notes
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['notes'], $notes);
+    
+        return [ 'ok' => true, 'data' => [ 'entry_id' => $entry_id, 'notes' => $notes ] ];
+
+    }
+
+    public function updateEnhanceEntryImage(int $entry_id): array {
+
+        // 1. Get entry and image URL
+        $entry = $this->getEntryById($entry_id);
+        $fieldValues = $entry['field_values'] ?? [];
+        $uploaded_url = isset($fieldValues['uploaded_photo_url']) ? (string) $fieldValues['uploaded_photo_url'] : '';
+
+        if ($uploaded_url === '') {
+            return [ 'ok' => false, 'error' => 'No uploaded photo url found for entry_id: ' . $entry_id ];
+        }
+
+        // 2. Convert URL to local path
+        $imagePath = $this->url_to_local_path($uploaded_url);
+        if ( ! $imagePath || ! file_exists($imagePath) ) {
+            return [ 'ok' => false, 'error' => 'Cannot resolve image path from URL' ];
+        }   
+
+        // 3. Process image with AI helper
+        $defaultPrompts = FrmAiSettingsHelper::getDefaultOnCreatePromptText();
+        if ($defaultPrompts === '') {
+            return [ 'ok' => false, 'error' => 'No default prompts configured for AI enhancer' ];
+        }
+
+        $aiHelper = new FrmAiImageHelper();
+        $res = $aiHelper->processImage($imagePath, [$defaultPrompts]);
+        if ( ! is_array($res) ) {
+            return [ 'ok' => false, 'error' => 'AI processing failed with unknown error' ];
+        }
+
+        // 4. Get final URL from AI response
+        $data = isset($res['data']) && is_array($res['data']) ? $res['data'] : [];
+        $final_url = isset($data['final_url']) ? (string) $data['final_url'] : '';
+
+        // 5. Update entry with new image URL (download, attach to media, update meta field)
+        if ($final_url !== '') {
+            $updateRes = $this->updateEntryImage($entry_id, [ 'new_image_url' => $final_url ]);
+            if ( ! $updateRes['ok'] ) {
+                return [ 'ok' => false, 'error' => 'Failed to update entry with enhanced image: ' . ($updateRes['error'] ?? 'unknown error') ];
+            } else {
+                return [ 'ok' => true, 'data' => [ 'entry_id' => $entry_id, 'final_image_url' => $final_url ] ];
+            }
+
+        } else {
+            return [ 'ok' => false, 'error' => 'AI processing did not return final_url' ];
+        }
+
+    }
+
+    /**
+     * Convert uploads URL -> local path (best effort)
+    */
+    public function url_to_local_path(string $url): string {
+
+        $url = trim($url);
+        if ($url === '') return '';
+
+        // Common WP uploads mapping
+        $uploads = wp_upload_dir();
+        $baseurl = isset($uploads['baseurl']) ? (string) $uploads['baseurl'] : '';
+        $basedir = isset($uploads['basedir']) ? (string) $uploads['basedir'] : '';
+
+        if ($baseurl && $basedir && strpos($url, $baseurl) === 0) {
+            $rel = ltrim(substr($url, strlen($baseurl)), '/');
+            return rtrim($basedir, '/\\') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+        }
+
+        // If url is on same host and contains /wp-content/
+        $parts = wp_parse_url($url);
+        $path  = isset($parts['path']) ? (string) $parts['path'] : '';
+
+        if ($path && strpos($path, '/wp-content/') !== false) {
+            // ABSPATH points to WP root
+            $abs = rtrim(ABSPATH, '/\\');
+            return $abs . str_replace('/', DIRECTORY_SEPARATOR, $path);
+        }
+
+        return '';
+    }
 
 }
