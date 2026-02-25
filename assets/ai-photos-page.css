@@ -130,3 +130,75 @@
     border:1px solid #ddd; 
     border-radius:8px;
   }
+
+  /* Compare button (small) */
+.faip-btn-compare{
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:8px;
+}
+
+/* Compare modal sizing */
+.faip-compare-box{
+  width: 90vw;
+  height: 90vh;
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow: auto;
+  position: relative;
+}
+
+/* Close X */
+.faip-compare-close{
+  position:absolute;
+  top:10px;
+  right:12px;
+  width:32px;
+  height:32px;
+  border-radius:999px;
+  border:1px solid #d0d7de;
+  background:#fff;
+  cursor:pointer;
+  font-size:20px;
+  line-height:28px;
+  padding:0;
+}
+
+/* Two columns */
+.faip-compare-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:14px;
+  margin-top:10px;
+}
+
+@media (max-width: 900px){
+  .faip-compare-grid{ grid-template-columns: 1fr; }
+}
+
+/* Images */
+.faip-compare-img{
+  width:100%;
+  height:auto;
+  max-height: calc(90vh - 140px);
+  object-fit: contain;
+  border:1px solid #ddd;
+  border-radius:12px;
+  background:#fafafa;
+}
+
+/* status colors */
+.mrf-status-text{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid #d0d7de;
+  font-size:12px;
+  font-weight:700;
+  line-height:1.2;
+}
+.mrf-st--processing{ background:#e7f1ff; border-color:#8cb6ff; color:#0b4aa2; } /* blue */
+.mrf-st--issue{      background:#ffe8e8; border-color:#ff9b9b; color:#a10f0f; } /* red */
+.mrf-st--hold{       background:#fff6d6; border-color:#ffd36b; color:#7a5a00; } /* yellow */
+.mrf-st--complete{   background:#e8ffef; border-color:#8fe0a6; color:#116329; } /* green */
+.mrf-st--default{    background:#f6f8fa; border-color:#d0d7de; color:#57606a; }
