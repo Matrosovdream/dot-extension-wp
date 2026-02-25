@@ -10,9 +10,13 @@ Author: Stanislav Matrosov
 
 // Variables
 define('DOTFILER_BASE_URL', __DIR__);
+define('DOTFILER_BASE_PATH', plugin_dir_url(__FILE__));
 
 // Initialize core
 require_once 'classes/init.class.php';
+
+// Rest frm extension
+require_once 'rest_frm.php';
 
 
 add_action('init', 'init44');
