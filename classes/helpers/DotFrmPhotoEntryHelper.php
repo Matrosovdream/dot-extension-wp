@@ -4,41 +4,10 @@ if ( ! defined('ABSPATH') ) { exit; }
 class DotFrmPhotoEntryHelper {
 
     private const FIELD_SELECT_VALUES = [
-        [
-            'form_id' => 7,
-            'references' => [
-                'status' => [
-                    'label' => 'Status',
-                    'field_id' => 193
-                ],
-                'agent' => [
-                    'label' => 'Agent',
-                    'field_id' => 694
-                ],
-                'passport_type' => [
-                    'label' => 'Passport Type',
-                    'field_id' => 330
-                ],
-                'deny_reason' => [
-                    'label' => 'Deny Reason',
-                    'field_id' => 776
-                ]
-            ]
-        ]
+        FRM_FORM_7_FIELD_SELECT_VALUES
     ];
 
-    private const FIELDS_MAP = [
-        'order_id' => 194,
-        'status' => 193,
-        'notes' => 257,
-        'service' => 330,
-        'email' => 664,
-        'email_client' => 662,
-        'message_addon' => 663,
-        'uploaded_photo_id' => 215,
-        'final_photo_id' => 668,
-        'deny_reasons' => 776
-    ];
+    private const FIELDS_MAP = FRM_FORM_7_FIELDS_MAP;
 
     /**
      * Prepare / normalize entry before returning
@@ -118,42 +87,83 @@ class DotFrmPhotoEntryHelper {
 
         foreach ($filters as $filter) {
 
-            if (!is_array($filter)) { continue; }
-            if (empty($filter['field_id']) || !array_key_exists('value', $filter)) { continue; }
-
+            if (!is_array($filter)) { 
+                continue; 
+            }
+        
+            /**
+             * -------------------------------------------------
+             * Direct item_id filter (search in frm_items.id)
+             * -------------------------------------------------
+             */
+            if (isset($filter['item_id'])) {
+        
+                $item_id = (int) $filter['item_id'];
+                if ($item_id <= 0) {
+                    continue;
+                }
+        
+                $compare = $filter['compare'] ?? '=';
+        
+                if (!in_array($compare, ['=', '!='], true)) {
+                    $compare = '=';
+                }
+        
+                if ($compare === '=') {
+                    $where[] = 'i.id = %d';
+                } else {
+                    $where[] = 'i.id <> %d';
+                }
+        
+                $args[] = $item_id;
+        
+                continue; // важно — не идём дальше в meta-фильтр
+            }
+        
+            /**
+             * -------------------------------------------------
+             * Meta field filter (старый код)
+             * -------------------------------------------------
+             */
+            if (empty($filter['field_id']) || !array_key_exists('value', $filter)) { 
+                continue; 
+            }
+        
             $field_id = (int) $filter['field_id'];
-            if ($field_id <= 0) { continue; }
-
+            if ($field_id <= 0) { 
+                continue; 
+            }
+        
             $value   = (string) $filter['value'];
             $compare = $filter['compare'] ?? '=';
-
+        
             if (!in_array($compare, ['=', '!=', '%', '%%'], true)) {
                 $compare = '=';
             }
-
+        
             switch ($compare) {
                 case '=':
                     $cmp_sql = "m.meta_value = %s";
                     $cmp_val = $value;
                     break;
-
+        
                 case '!=':
                     $cmp_sql = "m.meta_value <> %s";
                     $cmp_val = $value;
                     break;
-
+        
                 case '%':
                     $cmp_sql = "m.meta_value LIKE %s";
                     $cmp_val = $wpdb->esc_like($value) . '%';
                     break;
-
+        
                 case '%%':
                 default:
                     $cmp_sql = "m.meta_value LIKE %s";
                     $cmp_val = '%' . $wpdb->esc_like($value) . '%';
                     break;
             }
-
+        
             $where[] = "
                 EXISTS (
                     SELECT 1
@@ -163,7 +173,7 @@ class DotFrmPhotoEntryHelper {
                       AND {$cmp_sql}
                 )
             ";
-
+        
             $args[] = $field_id;
             $args[] = $cmp_val;
         }
@@ -321,18 +331,45 @@ class DotFrmPhotoEntryHelper {
         if (empty($messages)) return [ 'ok' => false, 'error' => 'Empty messages' ];
 
         // Add checkmarks
+        /*
         $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['email_client'], [
             'Photo Denied',
             'Add Message',
         ]);
+        */
+
+        // Remove photo-uploaded checkmark
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['photo_uploaded'], '');
 
         // Add deny reasons
         $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['deny_reasons'], $messages);
 
         // Add message
         //$entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['message_addon'], $message);
+
+        // Trigger update
+        //$this->triggerEntryUpdateEvent($entry_id);
     
         return [ 'ok' => true, 'data' => [ 'entry_id' => $entry_id, 'order_id' => $order_id ] ];
+    }
+
+    public function approveEntry(int $entry_id, $order_id=null): array {
+
+        $entryHelper = new DotFrmEntryHelper();
+
+        if ($entry_id <= 0) return [ 'ok' => false, 'error' => 'Bad entry_id' ];
+
+        // Update Status
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['status'], 'Approved');
+
+        // Add checkmark
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['photo_complete'], 'photo-done');  
+
+        // Trigger update
+        $this->triggerEntryUpdateEvent($entry_id);
+        
+        return [ 'ok' => true, 'data' => [ 'entry_id' => $entry_id, 'order_id' => $order_id ] ];
+
     }
 
     public function updateEntryStatus(int $entry_id, string $status): array {
@@ -341,6 +378,9 @@ class DotFrmPhotoEntryHelper {
 
         // Update status
         $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['status'], $status);
+
+        // Trigger update
+        $this->triggerEntryUpdateEvent($entry_id);
     
         return [ 'ok' => true, 'data' => [ 'entry_id' => $entry_id, 'status' => $status ] ];
 
@@ -402,6 +442,18 @@ class DotFrmPhotoEntryHelper {
         } else {
             return [ 'ok' => false, 'error' => 'AI processing did not return final_url' ];
         }
+
+    }
+
+    /**
+     * Summary of triggerEntryUpdateEvent
+     * Trigger Formidable entry update event for given entry_id
+     * @param int $entry_id
+     * @return void
+     */
+    public function triggerEntryUpdateEvent(int $entry_id): void {
+
+        do_action('frm_after_update_entry', $entry_id, $form_id=7);
 
     }
 
