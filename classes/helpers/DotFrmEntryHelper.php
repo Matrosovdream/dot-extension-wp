@@ -130,7 +130,8 @@ class DotFrmEntryHelper {
         array $filters,
         int $page = 1,
         int $paginate = 20,
-        int $form_id
+        int $form_id,
+        bool $showIds = false
     ): array {
     
         global $wpdb;
@@ -265,8 +266,12 @@ class DotFrmEntryHelper {
         $item_ids = array_values(array_unique(array_map(static fn($i) => (int) $i['id'], $items)));
     
         $out = [];
-        foreach ($item_ids as $id) {
-            $out[] = $this->getEntryById($id);
+        if ($showIds) {
+            $out = $item_ids;
+        } else {
+            foreach ($item_ids as $id) {
+                $out[] = $this->getEntryById($id);
+            }
         }
     
         return [
@@ -343,7 +348,7 @@ class DotFrmEntryHelper {
         int $fieldId = 152,
         string $operator = '>=',        // >= | <= | BETWEEN
         string $dateFrom,
-        ?string $dateTo = null          // требуется только для BETWEEN
+        ?string $dateTo = null 
     ): array {
     
         global $wpdb;

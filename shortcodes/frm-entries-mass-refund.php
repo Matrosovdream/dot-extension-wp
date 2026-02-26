@@ -14,10 +14,12 @@ final class DotFrmMassRefundShortcode_Simple {
 
     public const SHORTCODE = 'frm-entries-mass-refund';
     public const FORM_ID   = 4;
+    public const ORDER_FORM_ID = 1;
 
     /** GET params */
     private const QP_PAGE        = 'mrf_page';
     private const QP_STATUS      = 'mrf_status';
+    private const QP_ORDER_STATUS = 'mrf_order_status';
     private const QP_TIME        = 'mrf_time';
     private const QP_AMOUNT_TYPE = 'mrf_amount_type';
 
@@ -63,10 +65,14 @@ final class DotFrmMassRefundShortcode_Simple {
       
 
     private $helper;
+    private $entryHelper;
+    private $orderHelper;
 
     public function __construct() {
 
         $this->helper = new DotFrmMassRefundHelper();
+        $this->entryHelper = new DotFrmEntryHelper();
+        $this->orderHelper = new DotFrmOrderHelper();
 
         add_shortcode(self::SHORTCODE, [ $this, 'render_shortcode' ]);
 
@@ -83,6 +89,7 @@ final class DotFrmMassRefundShortcode_Simple {
     public function render_shortcode($atts = []): string {
 
         $form_id = self::FORM_ID;
+        $order_form_id = self::ORDER_FORM_ID;
 
         $this->enqueue_assets();
 
@@ -90,6 +97,7 @@ final class DotFrmMassRefundShortcode_Simple {
         $per_page = 20;
 
         $status = isset($_GET[self::QP_STATUS]) ? sanitize_text_field((string)$_GET[self::QP_STATUS]) : '';
+        $order_status = isset($_GET[self::QP_ORDER_STATUS]) ? sanitize_text_field((string)$_GET[self::QP_ORDER_STATUS]) : '';
         $time   = isset($_GET[self::QP_TIME]) ? sanitize_text_field((string)$_GET[self::QP_TIME]) : '';
         $atype  = isset($_GET[self::QP_AMOUNT_TYPE]) ? sanitize_text_field((string)$_GET[self::QP_AMOUNT_TYPE]) : '';
 
@@ -98,6 +106,9 @@ final class DotFrmMassRefundShortcode_Simple {
         $status_values = $refs['status'] ?? [];
         $amount_type   = $refs['amount_type'] ?? [];
         $orderStatusRef = $this->helper->getOrderRefStatuses();
+
+        // Data for Order form id
+        $orderRefs = $this->orderHelper->getSelectRefs($order_form_id);
 
         $filters = [];
 
@@ -121,6 +132,13 @@ final class DotFrmMassRefundShortcode_Simple {
                 'field_id' => 'created_at',
                 'value'    => $time,
                 'compare'  => 'between_time',
+            ];
+        }
+        if( !empty($order_status) ) {
+            $filters[] = [
+                'field_id' => 'order_status', // this is a virtual field handled in helper
+                'value'    => $order_status,
+                'compare'  => '=',
             ];
         }
 
@@ -194,6 +212,23 @@ final class DotFrmMassRefundShortcode_Simple {
                             $label = isset($opt['label']) ? (string)$opt['label'] : '';
                             $value = isset($opt['value']) ? (string)$opt['value'] : $label;
                             $selected = ($value !== '' && $value === $status) ? 'selected' : '';
+                            ?>
+                            <option value="<?php echo esc_attr($value); ?>" <?php echo $selected; ?>>
+                                <?php echo esc_html($label ?: $value); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="faip-filter">
+                    <label>Order status</label>
+                    <select name="<?php echo esc_attr(self::QP_ORDER_STATUS); ?>">
+                        <option value="">All</option>
+                        <?php foreach (($orderRefs['status']['values'] ?? []) as $opt): ?>
+                            <?php
+                            $label = isset($opt['label']) ? (string)$opt['label'] : '';
+                            $value = isset($opt['value']) ? (string)$opt['value'] : $label;
+                            $selected = ($value !== '' && $value === $order_status) ? 'selected' : '';
                             ?>
                             <option value="<?php echo esc_attr($value); ?>" <?php echo $selected; ?>>
                                 <?php echo esc_html($label ?: $value); ?>
@@ -518,6 +553,12 @@ final class DotFrmMassRefundShortcode_Simple {
                                     data-mrf-edit="<?php echo esc_attr($refund_id); ?>">
                                 Edit refund
                             </button>
+
+                            <a href="#" onClick="MyWindow=window.open('https://www.unitedpassport.com/orders/payment-refund/?id=<?php echo $order_id; ?>','MyWindow','width=600,height=450'); return false;">
+                                <button class="faip-btn" type="button">
+                                    Refund
+                                </button>
+                            </a>
     
                         </div>
     
@@ -556,7 +597,7 @@ final class DotFrmMassRefundShortcode_Simple {
             wp_send_json([ 'ok' => false, 'error' => 'Not logged in' ], 401);
         }
         if ( ! current_user_can('manage_options') ) {
-            wp_send_json([ 'ok' => false, 'error' => 'Forbidden' ], 403);
+            //wp_send_json([ 'ok' => false, 'error' => 'Forbidden' ], 403);
         }
         $nonce = isset($_POST['nonce']) ? (string)$_POST['nonce'] : '';
         if ( ! wp_verify_nonce($nonce, self::NONCE_ACTION) ) {

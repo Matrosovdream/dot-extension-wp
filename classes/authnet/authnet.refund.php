@@ -70,7 +70,7 @@ class Dotfiler_authnet_refund {
         );
 
     }
-
+    
     private function save_refund( $fields ) {
         global $wpdb;
 

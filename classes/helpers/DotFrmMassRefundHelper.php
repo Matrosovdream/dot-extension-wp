@@ -156,6 +156,42 @@ class DotFrmMassRefundHelper {
 
         foreach( $filters as $index => $filter ) {
 
+            if( $filter['field_id'] == 'order_status' ) {
+
+                $form1_ids = $helper->getList(
+                    [
+                        [
+                            'field_id' => 7,
+                            'value'    => $filter['value'],
+                            'compare'  => '=',
+                        ]
+                    ],
+                    1,
+                    100000,
+                    1,
+                    true
+                )['data'] ?? []; 
+
+                if( empty( $form1_ids ) ) {
+                    // No matching entries
+                    return [
+                        'data' => [],
+                        'total' => 0,
+                        'page' => $page,
+                        'paginate' => $paginate,
+                    ];
+                }
+        
+                $filters[] = [
+                    'field_id' => self::FIELDS_MAP['order_id'],
+                    'value'    => $form1_ids,
+                    'compare'  => 'IN',
+                ];
+
+                unset( $filters[$index] );
+
+            }
+
             if( $filter['compare'] == 'between_time' ) {
 
                 [$fromTime, $toTime] = array_map('trim', explode('/', $filter['value']));

@@ -34,6 +34,7 @@ class Dotfiler_init {
         // CRON
         require_once DOTFILER_BASE_URL.'/classes/cron/schedules.cron.php';
         require_once DOTFILER_BASE_URL.'/classes/cron/formidable/entrycleaner.cron.php';
+        require_once DOTFILER_BASE_URL.'/classes/cron/ai-image-enhancer/DotFrmImageEnhancerSingleEvent.php';
 
         // Migrations
         $this->include_migrations();
@@ -56,7 +57,7 @@ class Dotfiler_init {
 
         // Entries cleaner extra tables
         require_once DOTFILER_BASE_URL.'/classes//migrations/archive.entries.php';
-        
+
         // Indexes
         require_once DOTFILER_BASE_URL.'/classes/migrations/DotMigrationIndexes.php';
 
@@ -79,6 +80,9 @@ class Dotfiler_init {
         // Phone validation
         require_once DOTFILER_BASE_URL.'/shortcodes/phone.validate.php';
 
+        // Shortcode Ajax Loader
+        require_once DOTFILER_BASE_URL.'/shortcodes/shortcode.ajax.loader.php';
+
         // Entries mass photo
         require_once DOTFILER_BASE_URL.'/shortcodes/frm-entries-mass-photo.php';
 
@@ -87,7 +91,6 @@ class Dotfiler_init {
 
         // Entries mass refund
         require_once DOTFILER_BASE_URL.'/shortcodes/frm-entries-mass-refund.php';
-
 
     }
 

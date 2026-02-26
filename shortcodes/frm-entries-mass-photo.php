@@ -25,11 +25,11 @@ final class Frm_Entries_Mass_Photo_Shortcode {
     private const GET_ENTRIES_KEY = 'entries';
 
     // Letter size in mm: 215.90 x 279.40
-    private const SHEET_W_MM = '215.90mm';
+    private const SHEET_W_MM = '100%';
     private const SHEET_H_MM = '279.40mm';
 
     // Grid and margins (from your drawing)
-    private const GRID_CELL_MM = '50.80mm'; // each photo box
+    private const GRID_CELL_MM = '50.8mm'; // each photo box
     private const GRID_GAP_MM  = '10mm';    // spacing between boxes
     private const PAD_X_MM     = '21.75mm'; // left/right margin
     // Vertical total remaining = 279.4 - (4*50.8 + 3*10) = 46.2mm
@@ -314,24 +314,22 @@ final class Frm_Entries_Mass_Photo_Shortcode {
 
     private static function render_step2(array $entries_ids): string {
 
-        /**
-         * 12 example images (internet).
-         * If you want these to be based on the selected entries later, you can replace URLs with your own.
-         */
-        $imgs = [
-            'https://picsum.photos/id/1011/1200/900',
-            'https://picsum.photos/id/1015/1200/900',
-            'https://picsum.photos/id/1025/1200/900',
-            'https://picsum.photos/id/1035/1200/900',
-            'https://picsum.photos/id/1040/1200/900',
-            'https://picsum.photos/id/1050/1200/900',
-            'https://picsum.photos/id/1060/1200/900',
-            'https://picsum.photos/id/1070/1200/900',
-            'https://picsum.photos/id/1080/1200/900',
-            'https://picsum.photos/id/1084/1200/900',
-            'https://picsum.photos/id/1081/1200/900',
-            'https://picsum.photos/id/1082/1200/900',
-        ];
+        $imgs = [];
+
+        $img_urls = [];
+        foreach( $entries_ids as $id ) {
+
+            $entry = FrmEntry::getOne( $id, true );
+            $metas = $entry->metas;
+
+            // Just for a test
+            $file_id = 10442;
+            $file_url = wp_get_attachment_url( $file_id );
+
+            $photo_iframe_url = 'https://www.unitedpassport.com/photo-iframe/?order=' . $id;
+            $img_urls[] = '<iframe src="' . esc_url($photo_iframe_url) . '" width="196" height="196" scrolling="no"></iframe>';
+
+        }
 
         $ids_clean = array_map('intval', $entries_ids);
         $ids_str   = implode(', ', $ids_clean);
@@ -343,20 +341,27 @@ final class Frm_Entries_Mass_Photo_Shortcode {
         ?>
 
         <div class="femp-wrap femp-wrap-wide">
-            <div class="femp-topbar">
-                <a class="femp-btn femp-btn-back" href="<?php echo esc_url($back_url); ?>">&larr; Back</a>
-                <button class="femp-btn femp-btn-print" type="button" id="femp-print-btn">Print</button>
-            </div>
 
-            <div class="femp-title">Step 2 — Photos sheet</div>
-            <div class="femp-hint">Selected entries: <strong><?php echo esc_html($ids_str); ?></strong></div>
 
             <!-- This exact element will be printed -->
             <div class="femp-print-sheet" id="femp-print-area" aria-label="Print area">
                 <div class="femp-print-grid">
-                    <?php foreach ($imgs as $url): ?>
+                    <?php foreach ($img_urls as $html): ?>
                         <div class="femp-print-cell">
+
+                            <?php echo $html; ?>
+
+                            <?php /*
                             <img src="<?php echo esc_url($url); ?>" alt="" loading="lazy" />
+                            */?>
+                        </div>
+                        <div class="femp-print-cell">
+
+                            <?php echo $html; ?>
+
+                            <?php /*
+                            <img src="<?php echo esc_url($url); ?>" alt="" loading="lazy" />
+                            */?>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -364,8 +369,8 @@ final class Frm_Entries_Mass_Photo_Shortcode {
         </div>
 
         <style>
-            .femp-wrap{max-width:900px;margin:18px auto;padding:16px;border:1px solid #e6e6e6;border-radius:12px;background:#fff}
-            .femp-wrap-wide{max-width:980px}
+            .femp-wrap{background:#fff}
+            .femp-wrap-wide{background:#fff}
             .femp-topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
             .femp-title{font-size:18px;font-weight:700;margin-bottom:8px}
             .femp-hint{margin:0 0 14px;color:#666;font-size:13px}
@@ -383,32 +388,28 @@ final class Frm_Entries_Mass_Photo_Shortcode {
                 width: <?php echo esc_html(self::SHEET_W_MM); ?>;
                 height: <?php echo esc_html(self::SHEET_H_MM); ?>;
                 background:#fff;
-                border: 1px solid #000; /* the outer print line */
                 box-sizing: border-box;
                 padding: <?php echo esc_html(self::PAD_Y_MM); ?> <?php echo esc_html(self::PAD_X_MM); ?>;
-                margin: 0 auto;
             }
 
             .femp-print-grid{
                 display: grid;
-                grid-template-columns: repeat(3, <?php echo esc_html(self::GRID_CELL_MM); ?>);
+                grid-template-columns: repeat(3, 51.8mm);
                 grid-auto-rows: <?php echo esc_html(self::GRID_CELL_MM); ?>;
-                gap: <?php echo esc_html(self::GRID_GAP_MM); ?>;
+                row-gap: 10mm;
+                column-gap:  4.9mm;
                 width: fit-content;
                 height: fit-content;
                 margin: 0 auto;
             }
 
             .femp-print-cell{
-                width: <?php echo esc_html(self::GRID_CELL_MM); ?>;
+                width: 51.5mm;
                 height: <?php echo esc_html(self::GRID_CELL_MM); ?>;
-                border: 1px solid #000;  /* the square print line */
                 box-sizing: border-box;
                 overflow: hidden;
                 background:#fff;
-                display:flex;
                 align-items:center;
-                justify-content:center;
             }
 
             .femp-print-cell img{
