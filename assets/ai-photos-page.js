@@ -71,6 +71,70 @@
     });
   }
 
+  // ---------- Status helpers (text + class) ----------
+  function statusClassFor(status){
+    const s = String(status || '').trim();
+    if (s === 'Approved')   return 'mrf-st--complete';
+    if (s === 'Denied')     return 'mrf-st--issue';
+    if (s === 'Processing') return 'mrf-st--processing';
+    if (s === 'On Hold')    return 'mrf-st--hold';
+    return 'mrf-st--default';
+  }
+
+  function setRowStatus(entryId, status){
+    const tr = elTbody ? elTbody.querySelector('tr[data-row="' + entryId + '"]') : null;
+    if (!tr) return;
+    const el = tr.querySelector('.mrf-status-text');
+    if (!el) return;
+
+    const st = String(status || '').trim();
+    el.textContent = st;
+
+    el.classList.remove('mrf-st--complete','mrf-st--issue','mrf-st--processing','mrf-st--hold','mrf-st--default');
+    el.classList.add(statusClassFor(st));
+  }
+
+  function getRowStatusText(entryId){
+    const tr = elTbody ? elTbody.querySelector('tr[data-row="' + entryId + '"]') : null;
+    if (!tr) return '';
+    const el = tr.querySelector('.mrf-status-text');
+    return el ? String(el.textContent || '').trim() : '';
+  }
+
+  // ---------- Final image loader (wait for img.onload) ----------
+  function ensureFinalImgLoader(tr){
+    if (!tr) return null;
+    const fixedBlock = tr.querySelector('.fixed-image-block');
+    if (!fixedBlock) return null;
+
+    let loader = fixedBlock.querySelector('.faip-img-loader');
+    if (!loader) {
+      loader = document.createElement('div');
+      loader.className = 'faip-img-loader';
+      loader.style.display = 'none';
+      loader.style.marginTop = '6px';
+      loader.innerHTML = '<span class="faip-spinner"></span> <span class="faip-ai-label">Loading image…</span>';
+      fixedBlock.appendChild(loader);
+    }
+    return loader;
+  }
+
+  function setFinalImgLoading(entryId, on, msg){
+    const tr = elTbody ? elTbody.querySelector('tr[data-row="' + entryId + '"]') : null;
+    if (!tr) return;
+
+    const loader = ensureFinalImgLoader(tr);
+    if (!loader) return;
+
+    if (on) {
+      const label = loader.querySelector('.faip-ai-label');
+      if (label) label.textContent = msg ? String(msg) : 'Loading image…';
+      loader.style.display = 'block';
+    } else {
+      loader.style.display = 'none';
+    }
+  }
+
   // ---------------- Deny modal (multi-select with Select2 + Custom input) ----------------
   const denyModal = $('#faipDenyModal');
   const elDenyReason = $('#faipDenyReason'); // multiple
@@ -295,7 +359,7 @@
 
         if (json.final_url) {
           setRowFinalImage(uploadTargetId, json.final_url, 'Uploaded');
-          setRowTmpUrl(uploadTargetId, ''); // manual upload already final
+          setRowTmpUrl(uploadTargetId, '');
         }
 
         setUploadStatus('ok', 'Uploaded.');
@@ -323,20 +387,6 @@
   const emNotes = $('#faipEditMetaNotes');
 
   let editMetaTargetId = null;
-
-  function getRowStatusText(entryId){
-    const tr = elTbody ? elTbody.querySelector('tr[data-row="' + entryId + '"]') : null;
-    if (!tr) return '';
-    const el = tr.querySelector('.faip-status-text');
-    return el ? String(el.textContent || '').trim() : '';
-  }
-
-  function setRowStatusText(entryId, status){
-    const tr = elTbody ? elTbody.querySelector('tr[data-row="' + entryId + '"]') : null;
-    if (!tr) return;
-    const el = tr.querySelector('.faip-status-text');
-    if (el) el.textContent = status ? String(status) : '';
-  }
 
   function openEditMetaModal(entryId){
     editMetaTargetId = entryId;
@@ -390,10 +440,9 @@
         emConfirm.disabled = true;
         setStatus('', 'Updating #' + editMetaTargetId + '…');
 
-        const json = await ajaxEditMeta(editMetaTargetId, statusVal, notesVal);
+        await ajaxEditMeta(editMetaTargetId, statusVal, notesVal);
 
-        // In future when backend implements: update UI
-        if (statusVal) setRowStatusText(editMetaTargetId, statusVal);
+        if (statusVal) setRowStatus(editMetaTargetId, statusVal);
 
         setStatus('', 'Updated #' + editMetaTargetId);
         closeEditMetaModal();
@@ -416,7 +465,7 @@
     if (emModal && emModal.style.display === 'flex') { closeEditMetaModal(); return; }
   });
 
-  // Row action buttons (deny / compare / upload_final / edit_meta / view)
+  // ---------- Row action buttons ----------
   if (elTbody) {
     elTbody.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-action]');
@@ -439,13 +488,12 @@
       }
 
       if (action === 'upload_final') { openUploadModal(id); return; }
-
       if (action === 'edit_meta') { openEditMetaModal(id); return; }
-
-      if (action === 'view') alert('Open entry #' + id);
+      if (action === 'approve_row') { runRowApprove(id); return; }
     });
   }
 
+  // ---------- DENY submit ----------
   if (elDenyConfirm) {
     elDenyConfirm.addEventListener('click', async () => {
       if (!denyTargetId) return;
@@ -470,10 +518,7 @@
         fd.append('entry_id', String(denyTargetId));
         fd.append('order_id', String(orderId));
 
-        // send reasons[]
         reasons.forEach(r => fd.append('reasons[]', String(r)));
-
-        // include custom message if selected
         if (isCustom) fd.append('custom_message', String(customMsg));
 
         const res = await fetch((window.FAIP_AJAX && FAIP_AJAX.ajax_url) ? FAIP_AJAX.ajax_url : window.ajaxurl, {
@@ -486,6 +531,9 @@
         if (!res.ok || !json || json.ok !== true) {
           throw new Error((json && json.error) ? json.error : 'Deny request failed');
         }
+
+        // update row status on success
+        setRowStatus(denyTargetId, 'Denied');
 
         setStatus('', 'Denied #' + denyTargetId);
         closeDenyModal();
@@ -525,9 +573,29 @@
     const tr = elTbody ? elTbody.querySelector('tr[data-row="' + entryId + '"]') : null;
     if (!tr) return;
 
-    // update final image in UI
     const img = tr.querySelector('.fixed-image-block img.final-image');
-    if (img && finalUrl) img.src = finalUrl;
+
+    if (img && finalUrl) {
+      // show loader until image is actually loaded
+      setFinalImgLoading(entryId, true, 'Loading image…');
+
+      img.onload = null;
+      img.onerror = null;
+
+      img.onload = () => {
+        setFinalImgLoading(entryId, false);
+      };
+
+      img.onerror = () => {
+        setFinalImgLoading(entryId, false);
+        const wrap = tr.querySelector('.faip-ai-label-wrap');
+        if (wrap) wrap.innerHTML = '<div class="faip-ai-label" style="color:#b42318;">Failed to load image</div>';
+      };
+
+      // cache bust so browser doesn't show old cached image
+      const bust = (finalUrl.indexOf('?') >= 0) ? '&' : '?';
+      img.src = String(finalUrl) + bust + 't=' + Date.now();
+    }
 
     // label
     const wrap = tr.querySelector('.faip-ai-label-wrap');
@@ -634,13 +702,58 @@
     return json;
   }
 
+  // ✅ NEW: row approve handler (new backend action)
+  async function ajaxApproveRow(entryId, orderId){
+    const fd = new FormData();
+    fd.append('action', (window.FAIP_AJAX && FAIP_AJAX.action_approve_row) ? FAIP_AJAX.action_approve_row : 'dot_frm_ai_approve_row');
+    fd.append('nonce',  (window.FAIP_AJAX && FAIP_AJAX.nonce) ? FAIP_AJAX.nonce : '');
+    fd.append('entry_id', String(entryId));
+    fd.append('order_id', String(orderId || ''));
+
+    const res = await fetch((window.FAIP_AJAX && FAIP_AJAX.ajax_url) ? FAIP_AJAX.ajax_url : window.ajaxurl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: fd
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json || json.ok !== true) {
+      const msg = (json && json.error) ? json.error : ('Approve request failed for #' + entryId);
+      throw new Error(msg);
+    }
+    return json;
+  }
+
+  async function runRowApprove(entryId){
+    const tr = document.querySelector('tr[data-row="' + entryId + '"]');
+    const orderId = tr ? (tr.dataset.orderId || '').trim() : '';
+    if (!orderId) { setStatus('err', 'Missing order_id for #' + entryId); return; }
+
+    const btn = tr ? tr.querySelector('button[data-action="approve_row"][data-id="' + entryId + '"]') : null;
+
+    try {
+      if (btn) btn.disabled = true;
+      setStatus('', 'Approving #' + entryId + '…');
+
+      await ajaxApproveRow(entryId, orderId);
+
+      setRowStatus(entryId, 'Approved');
+
+      setStatus('', 'Approved #' + entryId);
+    } catch (err) {
+      console.error(err);
+      setStatus('err', 'Approve error on #' + entryId + ': ' + (err && err.message ? err.message : String(err)));
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function runBulkFix(){
     if (!elTbody) return;
 
     const ids = selectedIds();
     if (!ids.length) { setStatus('err', 'Select at least one entry.'); return; }
 
-    // UI lock
     if (elBulkFix) elBulkFix.disabled = true;
     if (elBulkApprove) elBulkApprove.disabled = true;
     if (elCheckAll) elCheckAll.disabled = true;
@@ -675,7 +788,6 @@
 
     setStatus('', 'Done. Updated ' + okCount + '/' + ids.length + '.');
 
-    // Unlock
     if (elCheckAll) elCheckAll.disabled = false;
     $$('#faipTbody input[type="checkbox"][data-id]').forEach(cb => cb.disabled = false);
 
@@ -694,7 +806,6 @@
       return;
     }
 
-    // UI lock
     if (elBulkFix) elBulkFix.disabled = true;
     if (elBulkApprove) elBulkApprove.disabled = true;
     if (elCheckAll) elCheckAll.disabled = true;
@@ -717,6 +828,8 @@
 
         setRowFinalImage(entryId, tmpUrl, 'Approved');
         setRowTmpUrl(entryId, '');
+
+        setRowStatus(entryId, 'Approved');
       } catch (err) {
         console.error(err);
         setStatus('err', 'Approve error on #' + entryId + ': ' + (err && err.message ? err.message : String(err)));
@@ -727,7 +840,6 @@
 
     setStatus('', 'Approve done. Updated ' + okCount + '/' + idsToApprove.length + '.');
 
-    // Unlock
     if (elCheckAll) elCheckAll.disabled = false;
     $$('#faipTbody input[type="checkbox"][data-id]').forEach(cb => cb.disabled = false);
 

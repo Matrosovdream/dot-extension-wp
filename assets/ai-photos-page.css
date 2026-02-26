@@ -67,11 +67,27 @@
   .faip-btn-danger{ border-color:#b00020; color:#b00020; }
   
   .faip-filters{
-    display:grid;
-    grid-template-columns: 220px 260px 1fr 1fr;
+    display:flex;
+    align-items:flex-end;
     gap:12px;
-    margin: 0 0 12px;
-    align-items:end;
+    flex-wrap:nowrap; /* всё в одну линию */
+  }
+  
+  /* Общий блок фильтра */
+  .faip-filter{
+    display:flex;
+    flex-direction:column;
+  }
+  
+  /* Entry ID + Order ID фиксированная ширина */
+  .faip-filter--narrow{
+    width:150px;
+    min-width:150px;
+  }
+  
+  /* Чтобы input занимал всю ширину блока */
+  .faip-filter--narrow input{
+    width:100%;
   }
   .faip-filter label{ display:block; font-size:12px; margin:0 0 6px; color:#444; font-weight:700; }
   .faip-filter select, .faip-filter input{
@@ -197,6 +213,18 @@
   font-weight:700;
   line-height:1.2;
 }
+
+.ffda-note-text {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 8px 10px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #fafafa;
+  white-space: pre-line;
+}
+
 .mrf-st--processing{ background:#e7f1ff; border-color:#8cb6ff; color:#0b4aa2; } /* blue */
 .mrf-st--issue{      background:#ffe8e8; border-color:#ff9b9b; color:#a10f0f; } /* red */
 .mrf-st--hold{       background:#fff6d6; border-color:#ffd36b; color:#7a5a00; } /* yellow */
