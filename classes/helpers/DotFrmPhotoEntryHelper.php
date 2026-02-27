@@ -445,6 +445,24 @@ class DotFrmPhotoEntryHelper {
 
     }
 
+    public function setEntryImageProcessing(int $entry_id, bool $isProcessing): void {
+
+        $entryHelper = new DotFrmEntryHelper();
+
+        // Update AI image processing field
+        $entryHelper->updateMetaField($entry_id, self::FIELDS_MAP['ai_image_processing'], $isProcessing ? true : false);
+
+    }
+
+    public function scheduleEntryImageProcessSet(int $entry_id, bool $isProcessing, int $delay_seconds = 90): bool {
+
+        $delay = FRM_AI_TIMEOUTS['gemini']['default'] ?? $delay_seconds; // From plugins/formidable-ai-image-enhancer/references.php
+
+        // Schedule single event to update image enhancer
+        return DotFrmSetImageProcessingSingleEvent::schedule($entry_id, $isProcessing, $delay);
+
+    }
+
     /**
      * Summary of triggerEntryUpdateEvent
      * Trigger Formidable entry update event for given entry_id
