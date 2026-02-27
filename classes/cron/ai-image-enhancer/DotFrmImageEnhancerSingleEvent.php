@@ -64,7 +64,19 @@ final class DotFrmImageEnhancerSingleEvent
 
         try {
             $photoHelper = new DotFrmPhotoEntryHelper();
+
+            // Set processing status to true
+            $photoHelper->setEntryImageProcessing($entry_id, true);
+
+            // Set single event for setting off this field value, in case of infinite loop
+            $photoHelper->scheduleEntryImageProcessSet($entry_id, false);
+
+            // Run image enhancement and update entry
             $photoHelper->updateEnhanceEntryImage($entry_id);
+
+            // Set processing status to false, finished
+            $photoHelper->setEntryImageProcessing($entry_id, false);
+
 
         } catch (\Throwable $e) {
             error_log('[DotFrmImageEnhancerSingleEvent] Error: ' . $e->getMessage());
