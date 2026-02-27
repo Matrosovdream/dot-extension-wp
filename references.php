@@ -13,7 +13,8 @@ define('FRM_FORM_7_FIELDS_MAP',[
     'final_photo_id' => 668,
     'deny_reasons' => 712,
     'photo_complete' => 669,
-    'photo_uploaded' => 274
+    'photo_uploaded' => 274,
+    'ai_image_processing' => 823
 ]);
 define('FRM_FORM_7_FIELD_SELECT_VALUES', [
     'form_id' => 7,
