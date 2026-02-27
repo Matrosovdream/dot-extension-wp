@@ -28,6 +28,6 @@ function dotExtDuplicateOrderId( int $entry_id ) {
 function dotExtUpdateImageEnhancer( int $entry_id ) {
 
     // Schedule single event to update image enhancer
-    DotFrmImageEnhancerSingleEvent::schedule($entry_id, 30);
+    DotFrmImageEnhancerSingleEvent::schedule($entry_id, 3);
 
 }
