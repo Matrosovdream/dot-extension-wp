@@ -1000,6 +1000,7 @@ final class DotFrmPhotosPageShortcode {
             $uploadedPhotoUrl = $fieldValues['uploaded_photo_url'] ?? '';
             $finalPhotoUrl    = $fieldValues['final_photo_url'] ?? '';
             $notes            = $fieldValues['notes'] ?? '';
+            $ai_image_proc   = $fieldValues['ai_image_processing'] ?? '';
     
             $denyBtn = '<button class="faip-btn faip-btn-danger" data-action="deny" data-id="' . esc_attr($id) . '" type="button">Deny</button>';
             $approveBtn = '<button class="faip-btn faip-btn-success" data-action="approve_row" data-id="' . esc_attr($id) . '" type="button">Approve</button>';
@@ -1099,6 +1100,12 @@ final class DotFrmPhotosPageShortcode {
                                 data-action="upload_final"
                                 data-id="<?php echo esc_attr($id); ?>"
                             >Upload</button>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($ai_image_proc !== ''): ?>
+                        <div class="faip-ai-label">
+                            Processing image on background..
                         </div>
                     <?php endif; ?>
 
