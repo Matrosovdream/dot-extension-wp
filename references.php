@@ -1,5 +1,11 @@
 <?php
 
+// Passport photo form #1
+define('FRM_FORM_7_FIELDS_MAP',[
+    'card_data_full' => 120,
+    'card_cc' => 770
+]);
+
 // Passport photo form #7
 define('FRM_FORM_7_FIELDS_MAP',[
     'order_id' => 194,
