@@ -3,7 +3,8 @@
 // Passport photo form #1
 define('FRM_FORM_7_FIELDS_MAP',[
     'card_data_full' => 120,
-    'card_cc' => 770
+    'card_cc' => 770,
+    'card_cc_bin' => 771
 ]);
 
 // Passport photo form #7
