@@ -1,10 +1,17 @@
 <?php
 
 // Passport photo form #1
-define('FRM_FORM_7_FIELDS_MAP',[
+define('FRM_FORM_1_FIELDS_MAP',[
+    'status' => 7,
+    'notes' => 5,
+    'application_status' => 386,
+    'process' => 273, // array
+    'tracking_number' => 344,
+    'payment_sum' => 148,
     'card_data_full' => 120,
     'card_cc' => 770,
-    'card_cc_bin' => 771
+    'card_cc_bin' => 771,
+    'entry_created_date' => 874
 ]);
 
 // Passport photo form #7
