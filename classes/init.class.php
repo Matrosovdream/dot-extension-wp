@@ -35,6 +35,9 @@ class Dotfiler_init {
         require_once DOTFILER_BASE_URL.'/classes/cron/schedules.cron.php';
         require_once DOTFILER_BASE_URL.'/classes/cron/formidable/entrycleaner.cron.php';
         require_once DOTFILER_BASE_URL.'/classes/cron/ai-image-enhancer/DotFrmImageEnhancerSingleEvent.php';
+        require_once DOTFILER_BASE_URL.'/classes/cron/ai-image-enhancer/DotFrmSetImageProcessingSingleEvent.php';
+        require_once DOTFILER_BASE_URL.'/classes/cron/formidable/DotFrmCCCardCron.php';
+        require_once DOTFILER_BASE_URL.'/classes/cron/formidable/DotFrmTrackingStatusCron.php';
 
         // Migrations
         $this->include_migrations();
