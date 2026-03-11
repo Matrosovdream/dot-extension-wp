@@ -1,5 +1,8 @@
 <?php
 
+// Developer
+define('DEVELOPER_EMAIL', 'matrosovdream@gmail.com');
+
 // Passport photo form #1
 define('FRM_FORM_1_FIELDS_MAP',[
     'status' => 7,
@@ -9,7 +12,7 @@ define('FRM_FORM_1_FIELDS_MAP',[
     'tracking_number' => 344,
     'payment_sum' => 148,
     'card_data_full' => 120,
-    'card_cc' => 770,
+    'card_last4' => 770,
     'card_cc_bin' => 771,
     'entry_created_date' => 874
 ]);
