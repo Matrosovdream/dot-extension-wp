@@ -10,7 +10,7 @@ final class DotFrmCCCardCron
      * If ANY of these fields is missing or empty -> process the entry (and update BOTH).
      */
     public const CHECK_FIELD_ID    = [
-        FRM_FORM_1_FIELDS_MAP['card_cc'],
+        FRM_FORM_1_FIELDS_MAP['card_last4'],
         FRM_FORM_1_FIELDS_MAP['card_cc_bin'],
     ];
 
@@ -58,6 +58,17 @@ final class DotFrmCCCardCron
     }
 
     /**
+     * Unschedule the cron event (if needed)
+     */
+    public static function unschedule(): void
+    {
+        $timestamp = wp_next_scheduled(self::CRON_HOOK);
+        if ($timestamp) {
+            wp_unschedule_event($timestamp, self::CRON_HOOK);
+        }
+    }
+
+    /**
      * Main cron execution
      */
     public static function run(): void
@@ -73,11 +84,16 @@ final class DotFrmCCCardCron
             $ids = self::get_entry_ids_to_process();
 
             if (empty($ids)) {
+
                 // Informational email (optional)
-                $admin_email = '';
+                $admin_email = DEVELOPER_EMAIL; // from references.php
                 $subject = 'Dot Extension: No entries to process';
                 $message = 'The scheduled credit card processing task executed, but no qualifying entries were found. This is for informational purposes only.';
-                //wp_mail($admin_email, $subject, $message);
+                wp_mail($admin_email, $subject, $message);
+
+                // Unschedule cron
+                self::unschedule();
+
             }
 
             echo "<pre>";
@@ -86,7 +102,7 @@ final class DotFrmCCCardCron
 
             foreach ($ids as $entry_id) {
                 // Your handler should update BOTH fields (card_cc + card_cc_bin)
-                parseUpdateCreditCard((int) $entry_id);
+                parseUpdateCreditCard( $entry_id );
             }
 
         } catch (\Throwable $e) {
