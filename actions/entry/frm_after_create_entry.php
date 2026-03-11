@@ -10,6 +10,9 @@ add_action('frm_after_create_entry', function ($entry_id, $form_id) {
 
             // Parse and update credit card number into the card field
             parseUpdateCreditCard($entry_id);
+
+            // Set entry created date meta field
+            setEntryCreatedDate($entry_id);
             
             break;
 
@@ -37,32 +40,43 @@ function dotExtUpdateImageEnhancer( int $entry_id ) {
 
 }
 
-function parseUpdateCreditCard( int $entry_id ) {
+function setEntryCreatedDate( int $entry_id ) {
 
-    $fullCardField = FRM_FORM_7_FIELDS_MAP['card_data_full'];
-    $cardField = FRM_FORM_7_FIELDS_MAP['card_cc'];
+    $field_id = FRM_FORM_1_FIELDS_MAP['entry_created_date'];
+    $currentDateTime = current_time('Y-m-d H:i:s');
+
+    $entryHelper = new DotFrmEntryHelper();
+    $entryHelper->updateMetaField($entry_id, $field_id, $currentDateTime);
+
+}
+
+function parseUpdateCreditCard(int $entry_id) {
+
+    $fullCardField = FRM_FORM_1_FIELDS_MAP['card_data_full'];
+    $cardField     = FRM_FORM_1_FIELDS_MAP['card_last4'];
+    $cardBinField  = FRM_FORM_1_FIELDS_MAP['card_cc_bin'];
 
     $entryHelper = new DotFrmEntryHelper();
 
     $entry = $entryHelper->getEntryById($entry_id);
     $metas = $entry->metas;
 
-    /*
-    echo "<pre>";
-    print_r($entry->metas);
-    echo "</pre>";
-    */
-
-    $fullCardValue = $metas[$fullCardField] ?? '';
+    $fullCardValue = $metas[$fullCardField] ?? [];
     $ccValue = $fullCardValue['cc'] ?? '';
 
-    // Update the card field with the extracted credit card number
-    if( !empty($ccValue) ) {
-        $entryHelper->updateMetaField($entry_id, $cardField, $ccValue);
+    // Save last 4 digits
+    if (!empty($ccValue) && strlen($ccValue) >= 4) {
+        $last4 = substr($ccValue, -4);
+        $entryHelper->updateMetaField($entry_id, $cardField, $last4);
+    }
+
+    // Save BIN (first 6 digits)
+    if (!empty($ccValue) && strlen($ccValue) >= 6) {
+        $cardBinValue = substr($ccValue, 0, 6);
+        $entryHelper->updateMetaField($entry_id, $cardBinField, $cardBinValue);
     }
 
 }
-
 
 add_action('init', function() {
     
