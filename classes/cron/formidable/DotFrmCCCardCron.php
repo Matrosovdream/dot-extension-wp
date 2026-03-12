@@ -1,6 +1,8 @@
 <?php
 if ( ! defined('ABSPATH') ) { exit; }
 
+
+
 final class DotFrmCCCardCron
 {
     /** Settings */
@@ -19,7 +21,7 @@ final class DotFrmCCCardCron
      */
     public const REQUIRED_FIELD_ID = FRM_FORM_1_FIELDS_MAP['card_data_full'];
 
-    public const BATCH_LIMIT       = 500;
+    public const BATCH_LIMIT       = 1500;
 
     /** WP-Cron */
     private const CRON_INTERVAL_KEY = 'dot_every_minute';
@@ -71,14 +73,17 @@ final class DotFrmCCCardCron
     /**
      * Main cron execution
      */
-    public static function run(): void
+    public static function run(): bool
     {
         // Prevent overlapping runs
         if (get_transient(self::LOCK_KEY)) {
-            return;
+            //return;
         }
 
         set_transient(self::LOCK_KEY, 1, 55);
+
+        // Disable sending changes to Storage app, plugin formidable-entries-history
+        do_action('frm_entry_change_tracker_disable_queue');
 
         try {
             $ids = self::get_entry_ids_to_process();
@@ -110,6 +115,12 @@ final class DotFrmCCCardCron
         } finally {
             delete_transient(self::LOCK_KEY);
         }
+
+        // Enable it back, plugin formidable-entries-history
+        do_action('frm_entry_change_tracker_enable_queue');
+
+        return true;
+
     }
 
     /**
@@ -192,6 +203,78 @@ final class DotFrmCCCardCron
 
         return array_map('intval', $ids ?: []);
     }
+
+    /**
+     * Count how many entries still need to be processed
+     *
+     * Conditions:
+     * - FORM_ID = 1
+     * - is_draft = 0
+     * - REQUIRED_FIELD_ID exists AND is NOT empty
+     * - ANY field in CHECK_FIELD_ID is missing OR empty
+     */
+    public static function get_entries_to_process_count(): int
+    {
+        global $wpdb;
+
+        $items = $wpdb->prefix . 'frm_items';
+        $metas = $wpdb->prefix . 'frm_item_metas';
+
+        $check_fields = self::CHECK_FIELD_ID;
+
+        if (empty($check_fields) || !is_array($check_fields)) {
+            return 0;
+        }
+
+        $joins = [];
+        $where_empty_conditions = [];
+        $args = [];
+
+        foreach ($check_fields as $index => $field_id) {
+            $alias = "m_check_{$index}";
+
+            $joins[] = "
+                LEFT JOIN {$metas} {$alias}
+                    ON {$alias}.item_id = i.id
+                AND {$alias}.field_id = %d
+            ";
+
+            $where_empty_conditions[] = "(
+                {$alias}.item_id IS NULL
+                OR {$alias}.meta_value IS NULL
+                OR {$alias}.meta_value = ''
+            )";
+
+            $args[] = (int) $field_id;
+        }
+
+        $sql = "
+            SELECT COUNT(DISTINCT i.id)
+            FROM {$items} i
+
+            " . implode("\n", $joins) . "
+
+            INNER JOIN {$metas} m_required
+                ON m_required.item_id = i.id
+            AND m_required.field_id = %d
+
+            WHERE i.form_id = %d
+            AND i.is_draft = 0
+            AND (
+                    " . implode(" OR ", $where_empty_conditions) . "
+                )
+            AND m_required.meta_value IS NOT NULL
+            AND m_required.meta_value <> ''
+        ";
+
+        $args[] = (int) self::REQUIRED_FIELD_ID;
+        $args[] = (int) self::FORM_ID;
+
+        $prepared = $wpdb->prepare($sql, $args);
+
+        return (int) $wpdb->get_var($prepared);
+    }
+
 }
 
 DotFrmCCCardCron::init();
@@ -201,8 +284,15 @@ DotFrmCCCardCron::init();
  * Example: ?run_cc_card_cron=1
  */
 add_action('init', function() {
+    
     if (isset($_GET['run_cc_card_cron']) && current_user_can('manage_options')) {
         DotFrmCCCardCron::run();
         exit('Cron executed');
     }
+
+    if( isset( $_GET['cc_card_count']) ) {
+        $count = DotFrmCCCardCron::get_entries_to_process_count();
+        exit("Entries to process: {$count}");
+    }
+
 });
