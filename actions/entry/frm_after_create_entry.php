@@ -43,10 +43,12 @@ function dotExtUpdateImageEnhancer( int $entry_id ) {
 function setEntryCreatedDate( int $entry_id ) {
 
     $field_id = FRM_FORM_1_FIELDS_MAP['entry_created_date'];
-    $currentDateTime = current_time('Y-m-d H:i:s');
+
+    $entryData = FrmEntry::getOne($entry_id);
+    $createdAt = $entryData->created_at; 
 
     $entryHelper = new DotFrmEntryHelper();
-    $entryHelper->updateMetaField($entry_id, $field_id, $currentDateTime);
+    $entryHelper->updateMetaField($entry_id, $field_id, $createdAt);
 
 }
 
