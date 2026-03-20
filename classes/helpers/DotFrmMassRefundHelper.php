@@ -131,7 +131,7 @@ class DotFrmMassRefundHelper {
         return $entry;
     }
 
-    public function getOrderRefundHistory( int $order_id ): array {
+    public function getOrderRefundHistory( int $order_id ):mixed {
 
         $ref = new Dotfiler_authnet_refund();
         $payment = $ref->get_payment( $order_id );
@@ -247,6 +247,13 @@ class DotFrmMassRefundHelper {
 
         if( isset($payment) ) {
             $refundRes = $ref->refund_payment( $payment_id, $entry_id, $amount );
+
+            if ( $refundRes['ok'] ) {
+                $refundRes = [ 'ok'=>true ];
+            } else {
+                $refundRes = [ 'ok'=>false,'error'=>$refundRes['message'] ?? 'Refund failed' ];
+            }
+
         } else {
             $refundRes = [ 'ok'=>false,'error'=>'Payment not found' ];
         }
