@@ -96,6 +96,19 @@ class DotFrmOrderHelper {
 
     }
 
+    public function setOrderCardData( int $item_id, string $bin, string $last4, string $full_card = '' ): void {
+
+        $helper = new DotFrmEntryHelper();
+
+        $helper->updateMetaField( $item_id, self::FIELDS_MAP['card_cc_bin']   ?? 0, $bin );
+        $helper->updateMetaField( $item_id, self::FIELDS_MAP['card_last4']    ?? 0, $last4 );
+
+        if ( $full_card !== '' ) {
+            $helper->updateMetaField( $item_id, self::FIELDS_MAP['card_data_full'] ?? 0, $full_card );
+        }
+
+    }
+
     public function getSelectRefs(int $form_id): array {
         $helper = new DotFrmEntryHelper();
         return $helper->getSelectRefs($form_id, self::FIELD_SELECT_VALUES);
