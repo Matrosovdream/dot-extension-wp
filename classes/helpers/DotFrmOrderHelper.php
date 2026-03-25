@@ -20,7 +20,7 @@ class DotFrmOrderHelper {
 
     private const FIELDS_MAP = FRM_FORM_1_FIELDS_MAP;
 
-    public function getOrderById(int $item_id) {
+    public function getOrderById(int $item_id, array $includeEntities = ['payment', 'easypost']) {
 
         $entryHelper = new DotFrmEntryHelper();
         $entry = $entryHelper->getEntryById($item_id);
@@ -29,7 +29,14 @@ class DotFrmOrderHelper {
         $entry = $entryHelper->prepareEntryItem($entry, self::FIELDS_MAP);
 
         // Get payment details
-        $entry['payment'] = $this->getOrderPayment( $item_id );
+        if ( in_array( 'payment', $includeEntities, true ) ) {
+            $entry['payment'] = $this->getOrderPayment( $item_id );
+        }
+
+        // Get Easypost shipments & labels
+        if ( in_array( 'easypost', $includeEntities, true ) ) {
+            $entry['easypost'] = $entryHelper->getEntryShipments( $item_id );
+        }
 
         return $entry;
 
