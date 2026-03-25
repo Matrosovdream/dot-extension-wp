@@ -61,7 +61,8 @@ class DotFrmOrderHelper {
         $payment_id = $payment['id'];
 
         if ($fullSum) {
-            $amount = $payment['full_amount'];
+            $alreadyRefunded = isset($payment['refunded_amount']) ? (float) $payment['refunded_amount'] : 0;
+            $amount = (float) $payment['full_amount'] - $alreadyRefunded;
         }
 
         if( isset($payment) ) {
@@ -89,7 +90,7 @@ class DotFrmOrderHelper {
         $this->setStatus( $entry_id, 'Refunded' );
 
         // Set process field to 'chargedback' (for reporting purposes)
-        $entryHelper->updateMetaField( $entry_id, self::FIELDS_MAP['process'] ?? 0, ['chargedback'] );
+        $entryHelper->updateMetaField( $entry_id, self::FIELDS_MAP['process'] ?? 0, ['chargeback'] );
 
         // Get order data after refund
         $orderData = $this->getOrderById( $entry_id );
